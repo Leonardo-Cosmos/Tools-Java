@@ -473,26 +473,6 @@ public class MainFrame extends JFrame {
 	}
 
 	private void startReceiveFile(File file, long fileSize, String fileId, String senderAddress) {
-		/*
-		JProgressBar progressBar = new JProgressBar(0, 100);
-		TransferFileServerWorker fileTransferServer = new TransferFileServerWorker(fileId);
-		fileTransferServer.addCompletedListener(event -> {
-			if (!event.isFailed()) {
-				progressBar.setValue(100);
-				addChatLabel("Received " + file.getName());
-				FileDigestResult digestResult = event.getFileDigestResult();
-				addChatLabel("MD5: " + digestResult.getMd5HexString() + " , SHA1: " + digestResult.getSha1HexString());
-			} else {
-				addChatLabel("Receive " + file.getName() + " failed");
-			}
-		});
-		fileTransferServer.addProgressUpdatedListeners(event -> {
-			int percent = (int) (event.getProcessed() * 100 / event.getTotal());
-			progressBar.setValue(percent);
-		});
-		addChatLabelWithComponents("Receiving: " + file.getName(), progressBar);
-		*/
-		
 		ReceiveFileTask task = new ReceiveFileTask();
 		task.setFile(file);
 		receiveFileTaskMap.put(fileId, task);
