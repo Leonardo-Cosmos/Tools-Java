@@ -13,7 +13,7 @@ import com.lanmessager.file.ProgressUpdatedListener;
 public class FileDigestCalculator {
 	private static final int BUFFER_LENGTH = 0x1000;
 	
-	private boolean isCanceled = false;
+	private volatile boolean isCanceled = false;
 	
 	private Set<ProgressUpdatedListener> progressUpdatedListeners;
 

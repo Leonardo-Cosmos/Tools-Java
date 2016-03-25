@@ -34,6 +34,10 @@ public class FileIdentifier {
 		return idBuilder.toString();
 	}
 	
+	public static String generateTemporaryIdentifierString() {
+		return DATE_FORMAT.format(new Date());
+	}
+	
 	/*public static FileIdentifier generateFileIdentifier(File file) {
 		StringBuilder idBuilder = new StringBuilder(); 
 		idBuilder.append(file.getName());

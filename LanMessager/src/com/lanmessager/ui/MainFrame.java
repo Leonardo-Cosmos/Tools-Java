@@ -8,7 +8,6 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
-
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
@@ -48,8 +47,6 @@ import com.lanmessager.communication.message.SendFileMessage;
 import com.lanmessager.file.FileIdentifier;
 import com.lanmessager.module.DigestFileTask;
 import com.lanmessager.module.FriendInfo;
-import com.lanmessager.module.ReceiveFileTask;
-import com.lanmessager.module.SendFileTask;
 
 public class MainFrame extends JFrame {
 	/**
@@ -76,9 +73,9 @@ public class MainFrame extends JFrame {
 	private JList<FriendInfo> friendList;
 
 	private DefaultListModel<FriendInfo> friendListModel = new DefaultListModel<>();
-	private Map<String, SendFileTask> sendFileTaskMap = new HashMap<>();
-	private Map<String, ReceiveFileTask> receiveFileTaskMap = new HashMap<>();
 	private Map<String, DigestFileTask> digestFileTaskMap = new HashMap<>();
+	private Map<String, SendFilePanel> sendFilePanelMap = new HashMap<>();
+	private Map<String, ReceiveFilePanel> receiveFilePanelMap = new HashMap<>();
 
 	private static HostInfo localHostInfo;
 
@@ -86,6 +83,8 @@ public class MainFrame extends JFrame {
 	private final NotifyReceiveWorker notifyReceiver = new NotifyReceiveWorker();
 	private final ChatSendWorker chatSender = new ChatSendWorker();
 	private final ChatReceiveWorker chatReceiver = new ChatReceiveWorker();
+	private final FileSendWorker fileSendWorker = new FileSendWorker();
+	private final FileReceiveWorker fileReceiveWorker = new FileReceiveWorker();
 	private final DigestFileWorker digestWorker = new DigestFileWorker();
 
 	public MainFrame() {
@@ -238,7 +237,7 @@ public class MainFrame extends JFrame {
 		chatReceiver.addReceiveFileListener(event -> {
 			ReceiveFileMessage message = event.getMessage();
 			if (message.isAccept()) {
-				startSendFile(message.getFileId(), message.getReceiverPort());
+				startSendFile(message.getFileId());
 			} else {
 				abortSendFile(message.getFileId());
 			}
@@ -272,6 +271,56 @@ public class MainFrame extends JFrame {
 			}
 			
 			task.getPanel().updateProgress(event.getProcessed(), event.getTotal());
+		});
+		
+		fileSendWorker.addCompletedListener(event -> {
+			String fileId = event.getFileId();
+			if (sendFilePanelMap.containsKey(fileId)) {
+				LOGGER.warn("Cannot find send file panel: " + fileId);
+				return;
+			}
+			SendFilePanel panel = sendFilePanelMap.get(fileId);
+			if (event.isCanceled()) {
+				panel.cancel();
+			} else if (event.isFailed()) {
+				panel.fail(event.getCause().getMessage());
+			} else {
+				panel.complete(event.getFileDigestResult());
+			}			
+		});
+		fileSendWorker.addProgressUpdatedListeners(event -> {
+			String fileId = event.getFileId();
+			if (sendFilePanelMap.containsKey(fileId)) {
+				LOGGER.warn("Cannot find send file panel: " + fileId);
+				return;
+			}
+			SendFilePanel panel = sendFilePanelMap.get(fileId);
+			panel.updateProgress(event.getProcessed(), event.getTotal());
+		});
+		
+		fileReceiveWorker.addCompletedListener(event -> {
+			String fileId = event.getFileId();
+			if (receiveFilePanelMap.containsKey(fileId)) {
+				LOGGER.warn("Cannot find receive file panel: " + fileId);
+				return;
+			}
+			ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
+			if (event.isCanceled()) {
+				panel.cancel();
+			} else if (event.isFailed()) {
+				panel.fail(event.getCause().getMessage());
+			} else {
+				panel.complete(event.getFileDigestResult());
+			}
+		});
+		fileReceiveWorker.addProgressUpdatedListeners(event -> {
+			String fileId = event.getFileId();
+			if (receiveFilePanelMap.containsKey(fileId)) {
+				LOGGER.warn("Cannot find receive file panel: " + fileId);
+				return;
+			}
+			ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
+			panel.updateProgress(event.getProcessed(), event.getTotal());
 		});
 	}
 
@@ -365,12 +414,13 @@ public class MainFrame extends JFrame {
 			File file = openFileChooser.getSelectedFile();
 			String fileId = FileIdentifier.generateIdentifierString(file);
 
-			SendFileTask task = new SendFileTask();
-			task.setFile(file);
-			task.setFileSize(file.length());
-			task.setAddress(receiverAddress);
-			sendFileTaskMap.put(fileId, task);
+			fileSendWorker.register(receiverAddress, fileId, file, file.length());
 
+			SendFilePanel panel = new SendFilePanel(file.getName());
+			addPanel(panel);
+			sendFilePanelMap.put(fileId, panel);
+			panel.addCancelButtonActionListener(event -> cancelSendFile(fileId));
+			
 			SendFileMessage message = new SendFileMessage();
 			message.setFileSize(file.length());
 			message.setFileName(file.getName());
@@ -378,74 +428,31 @@ public class MainFrame extends JFrame {
 			message.setSenderAddress(localHostInfo.getAddress());
 			chatSender.send(receiverAddress, message);
 			
-			addChatLabel("Send: " + file.getName());
+			//addChatLabel("Send: " + file.getName());
 		}
 	}
 
 	/**
 	 * Start sending file when remote host accept.
 	 */
-	private void startSendFile(String fileId, int port) {
-		if (!sendFileTaskMap.containsKey(fileId)) {
-			LOGGER.info("Cannot find file task " + fileId);
-			return;
-		}
-
-		SendFileTask task = sendFileTaskMap.get(fileId);
-
-		SendFilePanel panel = new SendFilePanel(task.getFile().getName());
-		addPanel(panel);
-		task.setPanel(panel);
-		panel.addCancelButtonActionListener(event -> cancelSendFile(fileId));
-		
-		FileSendWorker fileSender = new FileSendWorker(fileId);
-		fileSender.addCompletedListener(event -> {
-			if (!event.isFailed()) {
-				task.getPanel().complete(event.getFileDigestResult());
-			} else {
-				task.getPanel().fail(event.getCause().getMessage());
-			}
-			sendFileTaskMap.remove(fileId);
-		});
-		fileSender.addProgressUpdatedListeners(event -> {
-			task.getPanel().updateProgress(event.getProcessed(), event.getTotal());
-		});
-		
-		task.setSender(fileSender);
-		
-		fileSender.send(task.getAddress(), port, task.getFile(), task.getFileSize());
+	private void startSendFile(String fileId) {
+		fileSendWorker.send(fileId);
 	}
 
 	/**
 	 * Abort sending file when remote host reject.
 	 */
-	private void abortSendFile(String fileId) {
-		if (sendFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot find send file task " + fileId);
+	private void abortSendFile(String fileId) {		
+		if (sendFilePanelMap.containsKey(fileId)) {
+			LOGGER.warn("Cannot find send file panel: " + fileId);
 			return;
 		}
-
-		SendFileTask task = sendFileTaskMap.get(fileId);
-		addChatLabel(task.getFile() + " is aborted.");
-
-		sendFileTaskMap.remove(fileId);
+		SendFilePanel panel = sendFilePanelMap.get(fileId);
+		panel.abort();		
 	}
 
 	private void cancelSendFile(String fileId) {
-		if (!sendFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot find send file task " + fileId);
-			return;
-		}
-		
-		SendFileTask task = sendFileTaskMap.get(fileId);
-		
-		FileSendWorker sender = task.getSender();
-		sender.cancel();
-		
-		SendFilePanel panel = task.getPanel();
-		panel.cancel();
-		
-		sendFileTaskMap.remove(fileId);
+		fileSendWorker.cancel(fileId);
 	}
 
 	private void prepareReceiveFile(String fileName, long fileSize, String fileId, String senderAddress) {
@@ -459,7 +466,13 @@ public class MainFrame extends JFrame {
 			}
 			int saveFileOption = saveFileChooser.showSaveDialog(this);
 			if (JFileChooser.APPROVE_OPTION == saveFileOption) {
-				startReceiveFile(saveFileChooser.getSelectedFile(), fileSize, fileId, senderAddress);
+				File file = saveFileChooser.getSelectedFile();
+				startReceiveFile(file, fileSize, fileId, senderAddress);
+
+				ReceiveFilePanel panel = new ReceiveFilePanel(file.getName());
+				addPanel(panel);
+				receiveFilePanelMap.put(fileId, panel);
+				panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));
 			} else if (JFileChooser.APPROVE_OPTION == saveFileOption) {
 				abortReceiveFile(fileId, senderAddress);
 			}
@@ -467,37 +480,14 @@ public class MainFrame extends JFrame {
 		JButton abortButton = new JButton("Abort");
 		abortButton.addActionListener(e -> {
 			abortReceiveFile(fileId, senderAddress);
-		});
+		});		
 
 		addChatLabelWithComponents("Receive: " + fileName, acceptButton, abortButton);
 	}
 
 	private void startReceiveFile(File file, long fileSize, String fileId, String senderAddress) {
-		ReceiveFileTask task = new ReceiveFileTask();
-		task.setFile(file);
-		receiveFileTaskMap.put(fileId, task);
 		
-		ReceiveFilePanel panel = new ReceiveFilePanel(file.getName());
-		addPanel(panel);
-		task.setPanel(panel);
-		panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));
-		
-		FileReceiveWorker fileReceiver = new FileReceiveWorker(fileId);
-		fileReceiver.addCompletedListener(event -> {
-			if (!event.isFailed()) {
-				task.getPanel().complete(event.getFileDigestResult());
-			} else {
-				task.getPanel().fail(event.getCause().getMessage());
-			}
-			receiveFileTaskMap.remove(fileId);
-		});
-		fileReceiver.addProgressUpdatedListeners(event -> {
-			task.getPanel().updateProgress(event.getProcessed(), event.getTotal());
-		});
-		
-		task.setReceiver(fileReceiver);
-		
-		fileReceiver.launch(TransferFileServer.PORT_TRANSFER_FILE, file, fileSize);
+		fileReceiveWorker.receive(fileId);
 
 		ReceiveFileMessage message = new ReceiveFileMessage();
 		message.setAccept(true);
@@ -510,6 +500,13 @@ public class MainFrame extends JFrame {
 	 * Abort receiving file and notify remote host abort sending.
 	 */
 	private void abortReceiveFile(String fileId, String senderAddress) {
+		if (receiveFilePanelMap.containsKey(fileId)) {
+			LOGGER.warn("Cannot find receive file panel: " + fileId);
+			return;
+		}
+		ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
+		panel.abort();
+		
 		ReceiveFileMessage message = new ReceiveFileMessage();
 		message.setAccept(false);
 		message.setFileId(fileId);
@@ -518,22 +515,8 @@ public class MainFrame extends JFrame {
 	}
 
 	private void cancelReceiveFile(String fileId) {
-		if (!receiveFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot find receive file task " + fileId);
-			return;
-		}
-		
-		ReceiveFileTask task = receiveFileTaskMap.get(fileId);
-		
-		FileReceiveWorker receiver = task.getReceiver();
-		receiver.cancel();
-		
-		ReceiveFilePanel panel = task.getPanel();
-		panel.cancel();
-		
-		receiveFileTaskMap.remove(fileId);
+		fileReceiveWorker.cancel(fileId);
 	}
-
 
 	private void addPanel(JPanel panel) {
 		chatPanel.add(Box.createVerticalStrut(10));
@@ -541,11 +524,11 @@ public class MainFrame extends JFrame {
 		chatPanel.validate();
 	}
 	
-	private void addChatLabel(String text) {
+	/*private void addChatLabel(String text) {
 		JLabel label = new JLabel(text);
 		chatPanel.add(label);
 		chatPanel.validate();
-	}
+	}*/
 
 	private void addChatLabelWithComponents(String text, JComponent... components) {
 		JLabel label = new JLabel(text);

@@ -19,6 +19,10 @@ public class FileUncompletedException extends Exception {
 		this(processed, total, null);
 	}
 	
+	public FileUncompletedException(String message) {
+		this(0, 0, message);
+	}
+	
 	public FileUncompletedException(long processed, long total, String message) {
 		super(message);
 		

@@ -26,6 +26,13 @@ public abstract class FileProcessPanel extends JPanel {
 	private static final int PROGRESS_BAR_MIN = 0;
 	private static final int PROGRESS_BAR_MAX = 100;
 	
+	private static final String STATUS_LABEL_TEXT_INITIALIZE = "Ready to process file: %s";
+	private static final String STATUS_LABEL_TEXT_ABORT = "Processing file is aborted: %s";
+	private static final String STATUS_LABEL_TEXT_START = "Processing file: %s";
+	private static final String STATUS_LABEL_TEXT_SUCCEED = "Processed file successfully: %s";
+	private static final String STATUS_LABEL_TEXT_FAIL = "Process file failed: %s";
+	private static final String STATUS_LABEL_TEXT_CANCEL = "Processing file is canceled: %s";
+	
 	protected final JLabel statusLabel;
 	
 	protected final JProgressBar progressBar;
@@ -40,7 +47,7 @@ public abstract class FileProcessPanel extends JPanel {
 		BoxLayout boxLayout = new BoxLayout(this, BoxLayout.Y_AXIS);
 		setLayout(boxLayout);
 		
-		statusLabel = new JLabel(String.format(getStatusLabelTextStart(), fileName));
+		statusLabel = new JLabel(String.format(getStatusLabelTextInitialize(), fileName));
 		add(statusLabel);
 		
 		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);	
@@ -73,6 +80,14 @@ public abstract class FileProcessPanel extends JPanel {
 		validate();
 	}
 	
+	public void abort() {
+		statusLabel.setText(String.format(getStatusLabelTextAbort(), fileName));
+	}
+	
+	public void start() {
+		statusLabel.setText(String.format(getStatusLabelTextStart(), fileName));
+	}
+	
 	public void cancel() {
 		statusLabel.setText(String.format(getStatusLabelTextCancel(), fileName));
 		remove(cancelButton);
@@ -90,8 +105,27 @@ public abstract class FileProcessPanel extends JPanel {
 		return CANCEL_BUTTON_TEXT;
 	}
 	
-	protected abstract String getStatusLabelTextStart();
-	protected abstract String getStatusLabelTextSucceed();
-	protected abstract String getStatusLabelTextFail();
-	protected abstract String getStatusLabelTextCancel();
+	protected String getStatusLabelTextInitialize() {
+		return STATUS_LABEL_TEXT_INITIALIZE;
+	}
+
+	protected String getStatusLabelTextAbort() {
+		return STATUS_LABEL_TEXT_ABORT;
+	}
+
+	protected String getStatusLabelTextStart() {
+		return STATUS_LABEL_TEXT_START;
+	}
+
+	protected String getStatusLabelTextSucceed() {
+		return STATUS_LABEL_TEXT_SUCCEED;
+	}
+
+	protected String getStatusLabelTextFail() {
+		return STATUS_LABEL_TEXT_FAIL;
+	}
+
+	protected String getStatusLabelTextCancel() {
+		return STATUS_LABEL_TEXT_CANCEL;
+	}
 }

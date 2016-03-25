@@ -8,6 +8,8 @@ import com.lanmessager.ui.ReceiveFilePanel;
 public class ReceiveFileTask {
 	
 	private File file;
+
+	private long fileSize;
 	
 	private ReceiveFilePanel panel;
 	
@@ -19,6 +21,14 @@ public class ReceiveFileTask {
 
 	public void setFile(File file) {
 		this.file = file;
+	}
+
+	public long getFileSize() {
+		return fileSize;
+	}
+
+	public void setFileSize(long fileSize) {
+		this.fileSize = fileSize;
 	}
 
 	public ReceiveFilePanel getPanel() {
