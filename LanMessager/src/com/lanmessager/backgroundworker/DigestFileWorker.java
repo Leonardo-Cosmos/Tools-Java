@@ -1,12 +1,14 @@
 package com.lanmessager.backgroundworker;
 
 import java.io.File;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.swing.SwingWorker;
 
@@ -17,8 +19,12 @@ import com.lanmessager.file.FileDigestResult;
 
 public class DigestFileWorker {
 	private static final Logger LOGGER = Logger.getLogger(DigestFileWorker.class.getSimpleName());
+		
+	private final FileDigestCalculator calculator;
 	
-	private Map<String, DigestFileSwingWorker> workerMap;
+	private final DigestFileMonitorSwingWorker monitor;
+	
+	private volatile boolean isMonitorShutdown = false;
 	
 	private Set<FileCompletedListener> completedListeners;
 
@@ -51,7 +57,9 @@ public class DigestFileWorker {
 	}
 	
 	public DigestFileWorker() {
-		workerMap = new HashMap<>();
+		this.calculator = new FileDigestCalculator();
+		this.monitor = new DigestFileMonitorSwingWorker();
+		this.monitor.execute();
 	}
 	
 	/**
@@ -62,53 +70,43 @@ public class DigestFileWorker {
 	 * @param file
 	 */
 	public void digest(String fileId, File file) {
-		DigestFileSwingWorker worker = new DigestFileSwingWorker(fileId, file);
-		
-		workerMap.put(fileId, worker);
-		
-		worker.execute();
+		calculator.digestFile(fileId, file);
 	}
 	
 	public void cancel(String fileId) {
-		if (!workerMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot find file digest worker. File ID: " + fileId);
-			return;
-		}
+		calculator.cancel(fileId);
+	}
 		
-		DigestFileSwingWorker worker = workerMap.get(fileId);
-		worker.cancel();
-	}
-	
-	// XXX Merge complete trigger and rename.
-	protected void onCompleted(String fileId, FileDigestResult fileDigestResult) {
+	protected void onTaskDone(String fileId, Future<FileDigestResult> result) {	
 		if (completedListeners != null) {
 			FileCompletedEvent event = new FileCompletedEvent(this);
 			event.setFileId(fileId);
-			event.setFailed(false);
-			event.setFileDigestResult(fileDigestResult);
-			for (FileCompletedListener listener : completedListeners) {
-				listener.complete(event);
+			
+			if (!result.isDone()) {
+				LOGGER.warn("An unfinished task is reported: " + fileId);
+				return;
 			}
-		}
-	}
-	
-	protected void onCompletedByCancellation(String fileId) {
-		if (completedListeners != null) {
-			FileCompletedEvent event = new FileCompletedEvent(this);
-			event.setFileId(fileId);
-			event.setCanceled(true);
-			for (FileCompletedListener listener : completedListeners) {
-				listener.complete(event);
+			
+			if (result.isCancelled()) {
+				event.setCanceled(true);
+			} else {
+				try {
+					event.setFileDigestResult(result.get());
+				} catch (CancellationException ex) {
+					LOGGER.info("Task is canceled: " + fileId);
+					return;
+				} catch (InterruptedException ex) {
+					LOGGER.info("Task is interrupted: " + fileId);
+					return;
+				} catch (ExecutionException ex) {
+					event.setFailed(true);
+					event.setCause(ex.getCause());
+				} catch (Exception ex) {
+					event.setFailed(true);
+					event.setCause(ex);
+				}				
 			}
-		}
-	}
-	
-	protected void onCompletedByFailure(String fileId, Exception exception) {
-		if (completedListeners != null) {
-			FileCompletedEvent event = new FileCompletedEvent(this);
-			event.setFileId(fileId);
-			event.setFailed(true);
-			event.setCause(exception);
+			
 			for (FileCompletedListener listener : completedListeners) {
 				listener.complete(event);
 			}
@@ -127,62 +125,64 @@ public class DigestFileWorker {
 		}
 	}
 	
-	private class DigestFileSwingWorker extends SwingWorker<FileDigestResult, Long> {
-		private String fileId;
-		private File file;
-		private long fileLength;
-		private FileDigestCalculator calculator;
-		
-		public DigestFileSwingWorker(String fileId, File file) {
-			this.fileId = fileId;
-			this.file = file;
-			this.fileLength = file.length();
-		}
-
-		public void cancel() {
-			if (calculator != null) {
-				calculator.cancel();
-			}
-		}
+	private class DigestFileMonitorSwingWorker extends SwingWorker<Void, FileReport> {
+		private static final int REPORT_TIME_INTERVAL = 1000;
 		
 		@Override
-		protected FileDigestResult doInBackground() throws Exception {
+		protected Void doInBackground() throws Exception {
 			LOGGER.info("Digest file background thread starts.");
 			
-			calculator = new FileDigestCalculator();
-			calculator.addProgressUpdatedListener(event -> {
-				publish(event.getProcessed());
-			});
-			FileDigestResult result = calculator.digestFile(file);
+			while (!isMonitorShutdown) {				
+				Map<String, Future<FileDigestResult>> resultMap = calculator.reportResult();
+				Map<String, FileProgress> progressMap = calculator.reportProgress();
+				
+				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
+				resultMap.forEach((fileId, result) -> {
+					FileResultReport report = new FileResultReport();
+					report.setFileId(fileId);
+					report.setResult(result);
+					reportList.add(report);
+				});
+				progressMap.forEach((fileId, progress) -> {
+					FileProgressReport report = new FileProgressReport();
+					report.setFileId(fileId);
+					report.setProgress(progress);
+				});
+				
+				FileReport[] reports = new FileReport[reportList.size()];
+				reportList.toArray(reports);
+				publish(reports);
+				
+				Thread.sleep(REPORT_TIME_INTERVAL);
+			}			
 			
-			LOGGER.info("Digest file background thread exits.");
-			return result;
+			return null;
 		}
 		
 		@Override
-		protected void process(List<Long> chunks) {
+		protected void process(List<FileReport> chunks) {
 			super.process(chunks);
 			
-			long updatedLength = chunks.get(0);
-			onProgressUpdated(fileId, updatedLength, fileLength);
+			chunks.forEach(report -> {
+				if (report instanceof FileResultReport) {
+					FileResultReport resultReport = (FileResultReport) report;
+					onTaskDone(resultReport.getFileId(), resultReport.getResult());
+				} else if (report instanceof FileProgressReport) {
+					FileProgressReport progressReport = (FileProgressReport) report;
+					String fileId = progressReport.getFileId();				
+					FileProgress progress = progressReport.getProgress();
+					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
+				} else {
+					
+				}
+			});
 		}
 		
 		@Override
 		protected void done() {
 			super.done();
 			
-			workerMap.remove(fileId);
-			
-			if (calculator.isCanceled()) {
-				onCompletedByCancellation(fileId);
-			} else {				
-				try {
-					onCompleted(fileId, get());
-				} catch (InterruptedException | ExecutionException ex) {
-					onCompletedByFailure(fileId, ex);
-					LOGGER.error("Digest file background thread failed.", ex);
-				}				
-			}
+			LOGGER.info("Digest file background thread exits.");
 		}
 	}
 }
