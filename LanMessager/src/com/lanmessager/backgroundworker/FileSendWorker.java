@@ -172,22 +172,31 @@ public class FileSendWorker {
 				Map<String, Future<FileDigestResult>> resultMap = client.reportResult();
 				Map<String, FileProgress> progressMap = client.reportProgress();
 				
-				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
-				resultMap.forEach((fileId, result) -> {
-					FileResultReport report = new FileResultReport();
-					report.setFileId(fileId);
-					report.setResult(result);
-					reportList.add(report);
-				});
-				progressMap.forEach((fileId, progress) -> {
-					FileProgressReport report = new FileProgressReport();
-					report.setFileId(fileId);
-					report.setProgress(progress);
-				});
-				
-				FileReport[] reports = new FileReport[reportList.size()];
-				reportList.toArray(reports);
-				publish(reports);
+				if (resultMap.size() > 0 || progressMap.size() > 0) {
+					List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
+					
+					if (resultMap.size() > 0) {
+						resultMap.forEach((fileId, result) -> {
+							FileResultReport report = new FileResultReport();
+							report.setFileId(fileId);
+							report.setResult(result);
+							reportList.add(report);
+						});
+					}
+					
+					if (progressMap.size() > 0) {
+						progressMap.forEach((fileId, progress) -> {
+							FileProgressReport report = new FileProgressReport();
+							report.setFileId(fileId);
+							report.setProgress(progress);
+							reportList.add(report);
+						});
+					}
+					
+					FileReport[] reports = new FileReport[reportList.size()];
+					reportList.toArray(reports);
+					publish(reports);
+				}
 				
 				Thread.sleep(REPORT_TIME_INTERVAL);
 			}

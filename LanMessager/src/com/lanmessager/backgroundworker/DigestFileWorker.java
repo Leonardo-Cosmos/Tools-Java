@@ -132,26 +132,36 @@ public class DigestFileWorker {
 		protected Void doInBackground() throws Exception {
 			LOGGER.info("Digest file background thread starts.");
 			
-			while (!isMonitorShutdown) {				
+			while (!isMonitorShutdown) {
+				LOGGER.debug("Digest file background thread is monitoring.");
 				Map<String, Future<FileDigestResult>> resultMap = calculator.reportResult();
 				Map<String, FileProgress> progressMap = calculator.reportProgress();
 				
-				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
-				resultMap.forEach((fileId, result) -> {
-					FileResultReport report = new FileResultReport();
-					report.setFileId(fileId);
-					report.setResult(result);
-					reportList.add(report);
-				});
-				progressMap.forEach((fileId, progress) -> {
-					FileProgressReport report = new FileProgressReport();
-					report.setFileId(fileId);
-					report.setProgress(progress);
-				});
-				
-				FileReport[] reports = new FileReport[reportList.size()];
-				reportList.toArray(reports);
-				publish(reports);
+				if (resultMap.size() > 0 || progressMap.size() > 0) {
+					List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
+					
+					if (resultMap.size() > 0) {
+						resultMap.forEach((fileId, result) -> {
+							FileResultReport report = new FileResultReport();
+							report.setFileId(fileId);
+							report.setResult(result);
+							reportList.add(report);
+						});
+					}
+					
+					if (progressMap.size() > 0) {
+						progressMap.forEach((fileId, progress) -> {
+							FileProgressReport report = new FileProgressReport();
+							report.setFileId(fileId);
+							report.setProgress(progress);
+							reportList.add(report);
+						});
+					}
+					
+					FileReport[] reports = new FileReport[reportList.size()];
+					reportList.toArray(reports);
+					publish(reports);
+				}
 				
 				Thread.sleep(REPORT_TIME_INTERVAL);
 			}			
