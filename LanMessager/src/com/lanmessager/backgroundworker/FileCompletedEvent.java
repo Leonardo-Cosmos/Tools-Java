@@ -11,8 +11,8 @@ public class FileCompletedEvent extends EventObject {
 	private static final long serialVersionUID = 1L;
 
 	private FileDigestResult fileDigestResult;
-	private boolean isCanceled;
-	private boolean isFailed;
+	private boolean isCanceled = false;
+	private boolean isFailed = false;
 	private Throwable cause;
 	private String fileId;
 	

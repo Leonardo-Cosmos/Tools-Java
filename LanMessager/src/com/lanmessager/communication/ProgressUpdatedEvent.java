@@ -1,7 +1,7 @@
 package com.lanmessager.communication;
 
 import java.util.EventObject;
-
+// TODO Remove class
 public class ProgressUpdatedEvent extends EventObject {
 	
 	/**

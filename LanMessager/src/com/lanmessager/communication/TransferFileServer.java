@@ -8,9 +8,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +29,7 @@ public class TransferFileServer {
 
 	private final ExecutorService executor;
 
-	private final Map<String, ReceiveFilePendingTask> taskMap;
+	private final Map<String, ReceiveFilePendingTask> pendingTaskMap;
 	
 	private final Map<String, Future<FileDigestResult>> resultTempMap;
 	
@@ -43,30 +41,15 @@ public class TransferFileServer {
 
 	private boolean isRunning = false;
 
-	private Set<ProgressUpdatedListener> progressUpdatedListeners;
-
-	public void addProgressUpdatedListener(ProgressUpdatedListener listener) {
-		if (progressUpdatedListeners == null) {
-			progressUpdatedListeners = new HashSet<>();
-		}
-		progressUpdatedListeners.add(listener);
-	}
-
-	public void removeProgressUpdatedListener(ProgressUpdatedListener listener) {
-		if (progressUpdatedListeners != null) {
-			progressUpdatedListeners.remove(listener);
-		}
-	}
-
 	public TransferFileServer() {
 		executor = Executors.newCachedThreadPool();
-		taskMap = new HashMap<>();
+		pendingTaskMap = new HashMap<>();
 		resultTempMap = new HashMap<>();
 		resultMap = new HashMap<>();
 		progressMap = new HashMap<>();
 	}
 
-	public void start() throws IOException, FileUncompletedException {
+	public void start() throws IOException {
 		isRunning = true;
 
 		try {
@@ -89,7 +72,7 @@ public class TransferFileServer {
 
 	}
 
-	private void stop() {
+	public void stop() {
 		if (isRunning) {
 			isRunning = false;
 			try {
@@ -107,20 +90,98 @@ public class TransferFileServer {
 		return isRunning;
 	}
 
+	/**
+	 * Get ready for receiving a file asynchronously.
+	 * If remote host send file before local host invoke this method,
+	 * the file will be dropped.
+	 * 
+	 */
 	public void receive(String fileId, File file, long fileSize) {
 		ReceiveFilePendingTask task = new ReceiveFilePendingTask();
 		task.setFile(file);
 		task.setFileSize(fileSize);
 		
-		synchronized (taskMap) {
-			if (taskMap.containsKey(fileId)) {
+		synchronized (pendingTaskMap) {
+			if (pendingTaskMap.containsKey(fileId)) {
 				LOGGER.warn("Task exists: " + fileId);
 			}
 			// Existed task will be dropped.
-			taskMap.put(fileId, task);
+			pendingTaskMap.put(fileId, task);
 		}
 	}
 
+	// FIXME Cancel pending task.
+	public void cancel(String fileId) {
+		synchronized (pendingTaskMap) {
+			if (pendingTaskMap.containsKey(fileId)) {
+				ReceiveFilePendingTask task = pendingTaskMap.get(fileId);
+				task.setCanceled(true);
+				return;
+			}
+		}
+		Future<FileDigestResult> result = null;
+		synchronized (resultMap) {
+			if (!resultMap.containsKey(fileId)) {
+				LOGGER.warn("Task doesn't exist: " + fileId);
+				return;
+			}
+			result = resultMap.get(fileId);
+		}
+		if (result != null) {
+			if (!result.cancel(true)) {
+				LOGGER.warn("Task cannot be canceled: " + fileId);
+			}
+		}
+	}
+	
+	/**
+	 * Get a map of results which have been done.
+	 * <p/>
+	 * After reported once, the result cannot be reported again 
+	 * and corresponding progress will not be reported.
+	 * 
+	 */
+	public Map<String, Future<FileDigestResult>> reportResult() {
+		Map<String, Future<FileDigestResult>> reportMap = new HashMap<>();
+		synchronized (resultMap) {
+			resultMap.forEach((id, result) -> {
+				if (result.isDone()) {
+					reportMap.put(id, result);
+				}
+			});
+			reportMap.forEach((id, result) -> resultMap.remove(id));
+		}
+		if (!reportMap.isEmpty()) {
+			synchronized (progressMap) {
+				reportMap.forEach((id, result) -> progressMap.remove(id));
+			}
+		}
+		return reportMap;
+	}
+	
+	/** Get a map of task progress.
+	 * 
+	 */
+	public Map<String, Long> reportProgress() {
+		Map<String, Long> reportMap = new HashMap<>();
+		synchronized (progressMap) {
+			progressMap.forEach((id, progress) -> reportMap.put(id, progress));
+		}
+		return reportMap;
+	}
+	
+	protected void onProgressUpdated(String fileId, long processed, long total) {
+		/*
+		 * if (progressUpdatedListeners != null) { for (ProgressUpdatedListener
+		 * listener : progressUpdatedListeners) { ProgressUpdatedEvent event =
+		 * new ProgressUpdatedEvent(this); event.setProcessed(processed);
+		 * event.setTotal(total); listener.updateProgress(event); } }
+		 */
+		synchronized (progressMap) {
+			progressMap.put(fileId, processed);	
+		}
+	}
+	
 	private FileDigestResult transfer(String tempId, Socket socket)
 			throws IOException, FileUncompletedException {
 		InputStream input = null;
@@ -147,28 +208,38 @@ public class TransferFileServer {
 			
 			/* Move thread result to the map whose key is real ID. */
 			Future<FileDigestResult> result = null;
-			synchronized (resultTempMap) {
-				result = resultTempMap.get(tempId);
-			}
-			
-			synchronized (resultMap) {
-				if (resultMap.containsKey(fileId)) {
-					LOGGER.warn("Duplicated task: " + fileId);
-				}
-				resultMap.put(fileId, result);
-			}
-			
-			/* Retrieve file information. */
 			File file;
 			long fileSize;
-			synchronized (taskMap) {
-				if (!taskMap.containsKey(fileId)) {
-					LOGGER.warn("Pending task doesn't exist: " + fileId);
-					return null;
+			synchronized (resultTempMap) {
+				result = resultTempMap.get(tempId);
+				resultTempMap.remove(tempId);
+				
+				synchronized (resultMap) {
+					if (resultMap.containsKey(fileId)) {
+						LOGGER.warn("Duplicated task: " + fileId);
+						return null;
+					} else {
+						/* Retrieve file information. */
+						synchronized (pendingTaskMap) {
+							if (!pendingTaskMap.containsKey(fileId)) {
+								LOGGER.warn("Pending task doesn't exist: " + fileId);
+								return null;
+							}
+							
+							ReceiveFilePendingTask pendingTask = pendingTaskMap.get(fileId);
+							file = pendingTask.getFile();
+							fileSize = pendingTask.getFileSize();
+							/* 
+							 * Remove pending task and add result at synchronous block,
+							 * to ensure there is always only one of this receiving task information
+							 * can be retrieved.
+							 */
+							pendingTaskMap.remove(fileId);							
+							resultMap.put(fileId, result);
+						}
+					}
+
 				}
-				ReceiveFilePendingTask pendingTask = taskMap.get(fileId);
-				file = pendingTask.getFile();
-				fileSize = pendingTask.getFileSize();
 			}
 
 			/* Receive real file. */
@@ -221,18 +292,6 @@ public class TransferFileServer {
 		return fileDigestResult;
 	}
 
-	protected void onProgressUpdated(String fileId, long processed, long total) {
-		/*
-		 * if (progressUpdatedListeners != null) { for (ProgressUpdatedListener
-		 * listener : progressUpdatedListeners) { ProgressUpdatedEvent event =
-		 * new ProgressUpdatedEvent(this); event.setProcessed(processed);
-		 * event.setTotal(total); listener.updateProgress(event); } }
-		 */
-		synchronized (progressMap) {
-			progressMap.put(fileId, processed);	
-		}
-	}
-
 	private class ReceiveFileTask implements Callable<FileDigestResult> {
 		private final String tempId;
 		private final Socket socket;
@@ -251,6 +310,7 @@ public class TransferFileServer {
 	private class ReceiveFilePendingTask {
 		private File file;
 		private long fileSize;
+		private boolean canceled;
 		
 		public File getFile() {
 			return file;
@@ -263,7 +323,13 @@ public class TransferFileServer {
 		}
 		public void setFileSize(long fileSize) {
 			this.fileSize = fileSize;
-		}		
+		}
+		public boolean isCanceled() {
+			return canceled;
+		}
+		public void setCanceled(boolean canceled) {
+			this.canceled = canceled;
+		}
 	}
 	
 	/*private class ReceiveFileBlockingTask {

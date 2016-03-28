@@ -79,6 +79,7 @@ public class DigestFileWorker {
 		worker.cancel();
 	}
 	
+	// XXX Merge complete trigger and rename.
 	protected void onCompleted(String fileId, FileDigestResult fileDigestResult) {
 		if (completedListeners != null) {
 			FileCompletedEvent event = new FileCompletedEvent(this);

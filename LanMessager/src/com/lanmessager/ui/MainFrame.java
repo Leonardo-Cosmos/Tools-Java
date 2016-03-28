@@ -297,6 +297,7 @@ public class MainFrame extends JFrame {
 			SendFilePanel panel = sendFilePanelMap.get(fileId);
 			panel.updateProgress(event.getProcessed(), event.getTotal());
 		});
+		fileSendWorker.startMonitor();
 		
 		fileReceiveWorker.addCompletedListener(event -> {
 			String fileId = event.getFileId();
@@ -322,6 +323,8 @@ public class MainFrame extends JFrame {
 			ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
 			panel.updateProgress(event.getProcessed(), event.getTotal());
 		});
+		fileReceiveWorker.startReceiveServer();
+		fileReceiveWorker.startMonitor();
 	}
 
 	private void destroyWorker() {
@@ -334,6 +337,10 @@ public class MainFrame extends JFrame {
 		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, offlineMessage);
 
 		chatReceiver.stop();
+		
+		fileSendWorker.stopMonitor();
+		fileReceiveWorker.stopMonitor();
+		fileReceiveWorker.stopReceiveServer();
 	}
 
 	private void addFriend(String name, String address) {

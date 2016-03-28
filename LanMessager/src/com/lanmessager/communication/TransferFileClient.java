@@ -7,9 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,27 +30,16 @@ public class TransferFileClient {
 	
 	private final Map<String, Long> progressMap;
 
-	private Set<ProgressUpdatedListener> progressUpdatedListeners;
-
-	public void addProgressUpdatedListener(ProgressUpdatedListener listener) {
-		if (progressUpdatedListeners == null) {
-			progressUpdatedListeners = new HashSet<>();
-		}
-		progressUpdatedListeners.add(listener);
-	}
-
-	public void removeProgressUpdatedListener(ProgressUpdatedListener listener) {
-		if (progressUpdatedListeners != null) {
-			progressUpdatedListeners.remove(listener);
-		}
-	}
-
 	public TransferFileClient() {
 		executor = Executors.newCachedThreadPool();
 		resultMap = new HashMap<>();
 		progressMap = new HashMap<>();
 	}
 
+	/**
+	 * Start sending a file asynchronously.
+	 * 
+	 */
 	public void send(String fileId, String remoteHost, File file, long fileSize) {
 		Future<FileDigestResult> result = executor.submit(new SendFileTask(fileId, remoteHost, file, fileSize));
 		synchronized (resultMap) {
@@ -64,12 +51,55 @@ public class TransferFileClient {
 	}
 
 	public void cancel(String fileId) {
-		if (!resultMap.containsKey(fileId)) {
-			LOGGER.warn("Task doesn't exist: " + fileId);
-			return;
+		Future<FileDigestResult> result = null;
+		synchronized (resultMap) {
+			if (!resultMap.containsKey(fileId)) {
+				LOGGER.warn("Task doesn't exist: " + fileId);
+				return;
+			}
+			result = resultMap.get(fileId);
 		}
-		Future<FileDigestResult> result = resultMap.get(fileId);
-		result.cancel(true);
+		if (result != null) {
+			if (!result.cancel(true)) {
+				LOGGER.warn("Task cannot be canceled: " + fileId);
+			}
+		}
+	}
+	
+	/**
+	 * Get a map of results which have been done.
+	 * <p/>
+	 * After reported once, the result cannot be reported again 
+	 * and corresponding progress will not be reported.
+	 * 
+	 */
+	public Map<String, Future<FileDigestResult>> reportResult() {
+		Map<String, Future<FileDigestResult>> reportMap = new HashMap<>();
+		synchronized (resultMap) {
+			resultMap.forEach((id, result) -> {
+				if (result.isDone()) {
+					reportMap.put(id, result);
+				}
+			});
+			reportMap.forEach((id, result) -> resultMap.remove(id));
+		}
+		if (!reportMap.isEmpty()) {
+			synchronized (progressMap) {
+				reportMap.forEach((id, result) -> progressMap.remove(id));
+			}
+		}
+		return reportMap;
+	}
+	
+	/** Get a map of task progress.
+	 * 
+	 */
+	public Map<String, Long> reportProgress() {
+		Map<String, Long> reportMap = new HashMap<>();
+		synchronized (progressMap) {
+			progressMap.forEach((id, progress) -> reportMap.put(id, progress));
+		}
+		return reportMap;
 	}
 
 	protected void onProgressUpdated(String fileId, long processed, long total) {
