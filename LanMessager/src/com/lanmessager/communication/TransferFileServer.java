@@ -16,6 +16,7 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+import com.lanmessager.backgroundworker.FileProgress;
 import com.lanmessager.file.FileDigest;
 import com.lanmessager.file.FileDigestResult;
 import com.lanmessager.file.FileIdentifier;
@@ -35,7 +36,7 @@ public class TransferFileServer {
 	
 	private final Map<String, Future<FileDigestResult>> resultMap;
 
-	private final Map<String, Long> progressMap;
+	private final Map<String, FileProgress> progressMap;
 
 	private ServerSocket serverSocket;
 
@@ -162,8 +163,8 @@ public class TransferFileServer {
 	/** Get a map of task progress.
 	 * 
 	 */
-	public Map<String, Long> reportProgress() {
-		Map<String, Long> reportMap = new HashMap<>();
+	public Map<String, FileProgress> reportProgress() {
+		Map<String, FileProgress> reportMap = new HashMap<>();
 		synchronized (progressMap) {
 			progressMap.forEach((id, progress) -> reportMap.put(id, progress));
 		}
@@ -171,14 +172,11 @@ public class TransferFileServer {
 	}
 	
 	protected void onProgressUpdated(String fileId, long processed, long total) {
-		/*
-		 * if (progressUpdatedListeners != null) { for (ProgressUpdatedListener
-		 * listener : progressUpdatedListeners) { ProgressUpdatedEvent event =
-		 * new ProgressUpdatedEvent(this); event.setProcessed(processed);
-		 * event.setTotal(total); listener.updateProgress(event); } }
-		 */
 		synchronized (progressMap) {
-			progressMap.put(fileId, processed);	
+			FileProgress progress = new FileProgress();
+			progress.setProcessed(processed);
+			progress.setTotal(total);
+			progressMap.put(fileId, progress);	
 		}
 	}
 	

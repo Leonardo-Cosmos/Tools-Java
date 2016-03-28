@@ -21,13 +21,13 @@ import com.lanmessager.file.FileDigestResult;
 public class FileSendWorker {
 	private static final Logger LOGGER = Logger.getLogger(FileSendWorker.class.getSimpleName());
 
-	private Map<String, SendFileTask> sendFileTaskMap;
+	private final Map<String, SendFileTask> sendFileTaskMap;
 	
 	private final TransferFileClient client;
 	
 	private final SendFileMonitorSwingWorker monitor;
 	
-	private volatile boolean isShutdown = false;
+	private volatile boolean isMonitorShutdown = false;
 	
 	private Set<FileCompletedListener> completedListeners;
 
@@ -70,7 +70,7 @@ public class FileSendWorker {
 	}
 	
 	public void stopMonitor() {
-		isShutdown = true;
+		isMonitorShutdown = true;
 	}
 	
 	public void register(String receiverAddress, String fileId, File file, long fileSize) {
@@ -168,9 +168,9 @@ public class FileSendWorker {
 		protected Void doInBackground() throws Exception {
 			LOGGER.info("File sender background thread starts.");
 			
-			while (!isShutdown) {
+			while (!isMonitorShutdown) {
 				Map<String, Future<FileDigestResult>> resultMap = client.reportResult();
-				Map<String, Long> progressMap = client.reportProgress();
+				Map<String, FileProgress> progressMap = client.reportProgress();
 				
 				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
 				resultMap.forEach((fileId, result) -> {
@@ -210,8 +210,8 @@ public class FileSendWorker {
 						LOGGER.info("Cannot find task " + fileId);
 						return;
 					}
-					SendFileTask task = sendFileTaskMap.get(fileId);
-					onProgressUpdated(fileId, progressReport.getProgress(), task.getFileSize());
+					FileProgress progress = progressReport.getProgress();
+					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
 				} else {
 					
 				}
@@ -227,7 +227,7 @@ public class FileSendWorker {
 		}
 	}
 	
-	public class SendFileTask {
+	private class SendFileTask {
 
 		private File file;
 

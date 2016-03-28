@@ -1,13 +1,13 @@
 package com.lanmessager.backgroundworker;
 
 public class FileProgressReport extends FileReport {
-	private long progress;
+	private FileProgress progress;
 
-	public long getProgress() {
+	public FileProgress getProgress() {
 		return progress;
 	}
 
-	public void setProgress(long progress) {
+	public void setProgress(FileProgress progress) {
 		this.progress = progress;
 	}
 }
