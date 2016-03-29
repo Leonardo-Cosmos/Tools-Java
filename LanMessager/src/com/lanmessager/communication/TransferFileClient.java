@@ -24,6 +24,8 @@ public class TransferFileClient {
 	public static final byte ID_END = '\0';
 	
 	private static final int BUFFER_LENGTH = 0x1000;
+	
+	private static final int THREAD_NUMBER = 2;
 
 	private final ExecutorService executor;
 
@@ -32,7 +34,7 @@ public class TransferFileClient {
 	private final Map<String, FileProgress> progressMap;
 
 	public TransferFileClient() {
-		executor = Executors.newCachedThreadPool();
+		executor = Executors.newFixedThreadPool(THREAD_NUMBER);
 		resultMap = new HashMap<>();
 		progressMap = new HashMap<>();
 	}
@@ -65,6 +67,16 @@ public class TransferFileClient {
 				LOGGER.warn("Task cannot be canceled: " + fileId);
 			}
 		}
+	}
+	
+	public boolean isIdle() {
+		boolean isIdle = true;
+		synchronized (resultMap) {
+			if (resultMap.size() > 0) {
+				isIdle = false;
+			}
+		}		
+		return isIdle;
 	}
 	
 	/**

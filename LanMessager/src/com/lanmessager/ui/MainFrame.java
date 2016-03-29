@@ -248,9 +248,10 @@ public class MainFrame extends JFrame {
 		
 		/* Digest file worker. */
 		digestWorker.addCompletedListener(event -> {
-			DigestFileTask task = digestFileTaskMap.get(event.getFileId());
+			String fileId = event.getFileId();
+			DigestFileTask task = digestFileTaskMap.get(fileId);
 			if (task == null) {
-				LOGGER.warn("Digest file task is not found.");
+				LOGGER.warn("Digest file task is not found:" + fileId);
 				return;
 			}
 			
@@ -264,9 +265,10 @@ public class MainFrame extends JFrame {
 			digestFileTaskMap.remove(event.getFileId());
 		});
 		digestWorker.addProgressUpdatedListeners(event -> {
-			DigestFileTask task = digestFileTaskMap.get(event.getFileId());
+			String fileId = event.getFileId();
+			DigestFileTask task = digestFileTaskMap.get(fileId);
 			if (task == null) {
-				LOGGER.warn("Digest file task is not found.");
+				LOGGER.warn("Digest file task is not found:" + fileId);
 				return;
 			}
 			
@@ -297,7 +299,6 @@ public class MainFrame extends JFrame {
 			SendFilePanel panel = sendFilePanelMap.get(fileId);
 			panel.updateProgress(event.getProcessed(), event.getTotal());
 		});
-		fileSendWorker.startMonitor();
 		
 		fileReceiveWorker.addCompletedListener(event -> {
 			String fileId = event.getFileId();
@@ -324,7 +325,6 @@ public class MainFrame extends JFrame {
 			panel.updateProgress(event.getProcessed(), event.getTotal());
 		});
 		fileReceiveWorker.startReceiveServer();
-		fileReceiveWorker.startMonitor();
 	}
 
 	private void destroyWorker() {
@@ -338,8 +338,6 @@ public class MainFrame extends JFrame {
 
 		chatReceiver.stop();
 		
-		fileSendWorker.stopMonitor();
-		fileReceiveWorker.stopMonitor();
 		fileReceiveWorker.stopReceiveServer();
 	}
 

@@ -27,6 +27,8 @@ public class TransferFileServer {
 	public static final int PORT_TRANSFER_FILE = 12002;
 
 	private static final int BUFFER_LENGTH = 0x1000;
+	
+	private static final int THREAD_NUMBER = 2;
 
 	private final ExecutorService executor;
 
@@ -43,7 +45,7 @@ public class TransferFileServer {
 	private boolean isRunning = false;
 
 	public TransferFileServer() {
-		executor = Executors.newCachedThreadPool();
+		executor = Executors.newFixedThreadPool(THREAD_NUMBER);
 		pendingTaskMap = new HashMap<>();
 		resultTempMap = new HashMap<>();
 		resultMap = new HashMap<>();
@@ -133,6 +135,16 @@ public class TransferFileServer {
 				LOGGER.warn("Task cannot be canceled: " + fileId);
 			}
 		}
+	}
+	
+	public boolean isIdle() {
+		boolean isIdle = true;
+		synchronized (resultMap) {
+			if (resultMap.size() > 0) {
+				isIdle = false;
+			}
+		}		
+		return isIdle;
 	}
 	
 	/**

@@ -22,13 +22,13 @@ public class FileSendWorker {
 	private static final Logger LOGGER = Logger.getLogger(FileSendWorker.class.getSimpleName());
 
 	private final Map<String, SendFileTask> sendFileTaskMap;
-	
+
 	private final TransferFileClient client;
-	
+
 	private final SendFileMonitorSwingWorker monitor;
-	
-	private volatile boolean isMonitorShutdown = false;
-	
+
+	private final Object monitorLock;
+
 	private Set<FileCompletedListener> completedListeners;
 
 	private Set<FileProgressUpdatedListener> progressUpdatedListeners;
@@ -58,34 +58,28 @@ public class FileSendWorker {
 			progressUpdatedListeners.remove(listener);
 		}
 	}
-	
+
 	public FileSendWorker() {
 		this.sendFileTaskMap = new HashMap<>();
 		this.client = new TransferFileClient();
+		this.monitorLock = new Object();
 		this.monitor = new SendFileMonitorSwingWorker();
+		this.monitor.execute();
 	}
-	
-	public void startMonitor() {
-		monitor.execute();
-	}
-	
-	public void stopMonitor() {
-		isMonitorShutdown = true;
-	}
-	
+
 	public void register(String receiverAddress, String fileId, File file, long fileSize) {
 		if (sendFileTaskMap.containsKey(fileId)) {
 			LOGGER.warn("Duplicated task: " + fileId);
 			return;
 		}
-		
+
 		SendFileTask task = new SendFileTask();
 		task.setFile(file);
 		task.setFileSize(fileSize);
 		task.setAddress(receiverAddress);
 		sendFileTaskMap.put(fileId, task);
 	}
-	
+
 	public void unregister(String fileId) {
 		if (!sendFileTaskMap.containsKey(fileId)) {
 			LOGGER.info("Cannot find task " + fileId);
@@ -93,17 +87,21 @@ public class FileSendWorker {
 		}
 		sendFileTaskMap.remove(fileId);
 	}
-	
+
 	public void send(String fileId) {
 		if (!sendFileTaskMap.containsKey(fileId)) {
 			LOGGER.warn("Cannot find send file task " + fileId);
 			return;
 		}
 		SendFileTask task = sendFileTaskMap.get(fileId);
-		client.send(fileId, task.getAddress(), task.getFile(), task.getFileSize());		
+		client.send(fileId, task.getAddress(), task.getFile(), task.getFileSize());
+
+		synchronized (monitorLock) {
+			monitorLock.notify();
+		}
 	}
-	
-	public void cancel(String fileId) {		
+
+	public void cancel(String fileId) {
 		client.cancel(fileId);
 	}
 
@@ -111,18 +109,18 @@ public class FileSendWorker {
 		if (!sendFileTaskMap.containsKey(fileId)) {
 			LOGGER.warn("Cannot find send file task " + fileId);
 			return;
-		}		
-		sendFileTaskMap.remove(fileId);		
-		
+		}
+		sendFileTaskMap.remove(fileId);
+
 		if (completedListeners != null) {
 			FileCompletedEvent event = new FileCompletedEvent(this);
 			event.setFileId(fileId);
-			
+
 			if (!result.isDone()) {
 				LOGGER.warn("An unfinished task is reported: " + fileId);
 				return;
 			}
-			
+
 			if (result.isCancelled()) {
 				event.setCanceled(true);
 			} else {
@@ -140,9 +138,9 @@ public class FileSendWorker {
 				} catch (Exception ex) {
 					event.setFailed(true);
 					event.setCause(ex);
-				}				
+				}
 			}
-			
+
 			for (FileCompletedListener listener : completedListeners) {
 				listener.complete(event);
 			}
@@ -163,45 +161,52 @@ public class FileSendWorker {
 
 	private class SendFileMonitorSwingWorker extends SwingWorker<Void, FileReport> {
 		private static final int REPORT_TIME_INTERVAL = 1000;
-			
+
 		@Override
 		protected Void doInBackground() throws Exception {
-			LOGGER.info("File sender background thread starts.");
-			
-			while (!isMonitorShutdown) {
-				Map<String, Future<FileDigestResult>> resultMap = client.reportResult();
-				Map<String, FileProgress> progressMap = client.reportProgress();
-				
-				if (resultMap.size() > 0 || progressMap.size() > 0) {
-					List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size()); 
-					
-					if (resultMap.size() > 0) {
-						resultMap.forEach((fileId, result) -> {
-							FileResultReport report = new FileResultReport();
-							report.setFileId(fileId);
-							report.setResult(result);
-							reportList.add(report);
-						});
+			LOGGER.info("Background thread starts.");
+
+			while (true) {
+				if (client.isIdle()) {
+					// Block monitor thread if calculator is idle.
+					synchronized (monitorLock) {
+						LOGGER.info("Background thread sleeps.");
+						monitorLock.wait();
+						LOGGER.info("Background thread wakes up.");
 					}
-					
-					if (progressMap.size() > 0) {
-						progressMap.forEach((fileId, progress) -> {
-							FileProgressReport report = new FileProgressReport();
-							report.setFileId(fileId);
-							report.setProgress(progress);
-							reportList.add(report);
-						});
-					}
-					
-					FileReport[] reports = new FileReport[reportList.size()];
-					reportList.toArray(reports);
-					publish(reports);
 				}
-				
+
+				LOGGER.debug("Background thread is working.");
+
+				Map<String, FileProgress> progressMap = client.reportProgress();
+				Map<String, Future<FileDigestResult>> resultMap = client.reportResult();
+
+				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size());
+
+				if (progressMap.size() > 0) {
+					progressMap.forEach((fileId, progress) -> {
+						FileProgressReport report = new FileProgressReport();
+						report.setFileId(fileId);
+						report.setProgress(progress);
+						reportList.add(report);
+					});
+				}
+
+				if (resultMap.size() > 0) {
+					resultMap.forEach((fileId, result) -> {
+						FileResultReport report = new FileResultReport();
+						report.setFileId(fileId);
+						report.setResult(result);
+						reportList.add(report);
+					});
+				}
+
+				FileReport[] reports = new FileReport[reportList.size()];
+				reportList.toArray(reports);
+				publish(reports);
+
 				Thread.sleep(REPORT_TIME_INTERVAL);
 			}
-
-			return null;
 		}
 
 		@Override
@@ -222,26 +227,26 @@ public class FileSendWorker {
 					FileProgress progress = progressReport.getProgress();
 					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
 				} else {
-					
+
 				}
 			});
-			
+
 		}
 
 		@Override
 		protected void done() {
 			super.done();
-			
-			LOGGER.info("File sender background thread exits.");
+
+			LOGGER.info("Background thread exits.");
 		}
 	}
-	
+
 	private class SendFileTask {
 
 		private File file;
 
 		private long fileSize;
-		
+
 		private String receiverAddress;
 
 		public File getFile() {

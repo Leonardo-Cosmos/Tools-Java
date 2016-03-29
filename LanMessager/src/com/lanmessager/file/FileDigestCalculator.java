@@ -20,6 +20,8 @@ public class FileDigestCalculator {
 
 	private static final int BUFFER_LENGTH = 0x1000;
 
+	private static final int THREAD_NUMBER = 2;
+	
 	private final ExecutorService executor;
 
 	private final Map<String, Future<FileDigestResult>> resultMap;
@@ -27,7 +29,7 @@ public class FileDigestCalculator {
 	private final Map<String, FileProgress> progressMap;
 
 	public FileDigestCalculator() {
-		executor = Executors.newCachedThreadPool();
+		executor = Executors.newFixedThreadPool(THREAD_NUMBER);
 		resultMap = new HashMap<>();
 		progressMap = new HashMap<>();
 	}
@@ -60,6 +62,16 @@ public class FileDigestCalculator {
 				LOGGER.warn("Task cannot be canceled: " + fileId);
 			}
 		}
+	}
+	
+	public boolean isIdle() {
+		boolean isIdle = true;
+		synchronized (resultMap) {
+			if (resultMap.size() > 0) {
+				isIdle = false;
+			}
+		}		
+		return isIdle;
 	}
 	
 	/**
@@ -121,7 +133,7 @@ public class FileDigestCalculator {
 				fileDigest.update(buffer, 0, readLength);
 
 				updatedLength += readLength;
-				LOGGER.debug("Calculate " + updatedLength + " bytes (total " + fileLength + " bytes).");
+				//LOGGER.debug("Calculate " + updatedLength + " bytes (total " + fileLength + " bytes).");
 				
 				onProgressUpdated(fileId, updatedLength, fileLength);
 			}
