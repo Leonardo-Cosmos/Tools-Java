@@ -63,8 +63,9 @@ public class TransferFileClient {
 			result = resultMap.get(fileId);
 		}
 		if (result != null) {
-			if (!result.cancel(true)) {
-				LOGGER.warn("Task cannot be canceled: " + fileId);
+			boolean hasCancelled = result.cancel(true);
+			if (!hasCancelled) {
+				LOGGER.warn("Task cannot be cancelled: " + fileId);
 			}
 		}
 	}

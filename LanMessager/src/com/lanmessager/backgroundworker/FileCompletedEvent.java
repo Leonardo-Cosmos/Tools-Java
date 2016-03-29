@@ -11,7 +11,7 @@ public class FileCompletedEvent extends EventObject {
 	private static final long serialVersionUID = 1L;
 
 	private FileDigestResult fileDigestResult;
-	private boolean isCanceled = false;
+	private boolean isCancelled = false;
 	private boolean isFailed = false;
 	private Throwable cause;
 	private String fileId;
@@ -28,12 +28,12 @@ public class FileCompletedEvent extends EventObject {
 		this.fileDigestResult = fileDigestResult;
 	}
 
-	public boolean isCanceled() {
-		return isCanceled;
+	public boolean isCancelled() {
+		return isCancelled;
 	}
 
-	public void setCanceled(boolean isCanceled) {
-		this.isCanceled = isCanceled;
+	public void setCancelled(boolean isCancelled) {
+		this.isCancelled = isCancelled;
 	}
 
 	public boolean isFailed() {

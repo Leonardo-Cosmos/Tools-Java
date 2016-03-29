@@ -255,7 +255,7 @@ public class MainFrame extends JFrame {
 				return;
 			}
 			
-			if (event.isCanceled()) {
+			if (event.isCancelled()) {
 				task.getPanel().cancel();
 			} else if (event.isFailed()) {
 				task.getPanel().fail(event.getCause().getMessage());
@@ -282,7 +282,7 @@ public class MainFrame extends JFrame {
 				return;
 			}
 			SendFilePanel panel = sendFilePanelMap.get(fileId);
-			if (event.isCanceled()) {
+			if (event.isCancelled()) {
 				panel.cancel();
 			} else if (event.isFailed()) {
 				panel.fail(event.getCause().getMessage());
@@ -307,7 +307,7 @@ public class MainFrame extends JFrame {
 				return;
 			}
 			ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
-			if (event.isCanceled()) {
+			if (event.isCancelled()) {
 				panel.cancel();
 			} else if (event.isFailed()) {
 				panel.fail(event.getCause().getMessage());

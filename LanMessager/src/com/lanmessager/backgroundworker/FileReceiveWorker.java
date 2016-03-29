@@ -151,12 +151,12 @@ public class FileReceiveWorker {
 			}
 
 			if (result.isCancelled()) {
-				event.setCanceled(true);
+				event.setCancelled(true);
 			} else {
 				try {
 					event.setFileDigestResult(result.get());
 				} catch (CancellationException ex) {
-					LOGGER.info("Task is canceled: " + fileId);
+					LOGGER.info("Task is cancelled: " + fileId);
 					return;
 				} catch (InterruptedException ex) {
 					LOGGER.info("Task is interrupted: " + fileId);
