@@ -10,6 +10,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.log4j.Logger;
 
@@ -20,17 +22,20 @@ public class FileDigestCalculator {
 
 	private static final int BUFFER_LENGTH = 0x1000;
 
-	private static final int THREAD_NUMBER = 2;
+	private static final int THREAD_NUMBER = 3;
 	
 	private final ExecutorService executor;
 
 	private final Map<String, Future<FileDigestResult>> resultMap;
 
 	private final Map<String, FileProgress> progressMap;
+	
+	private final Lock progressLock;
 
 	public FileDigestCalculator() {
 		executor = Executors.newFixedThreadPool(THREAD_NUMBER);
 		resultMap = new HashMap<>();
+		progressLock = new ReentrantLock();
 		progressMap = new HashMap<>();
 	}
 	
@@ -58,8 +63,9 @@ public class FileDigestCalculator {
 			result = resultMap.get(fileId);
 		}
 		if (result != null) {
-			if (!result.cancel(true)) {
-				LOGGER.warn("Task cannot be canceled: " + fileId);
+			boolean hasCancelled = result.cancel(true);
+			if (!hasCancelled) {
+				LOGGER.warn("Task cannot be cancelled: " + fileId);
 			}
 		}
 	}
@@ -84,6 +90,7 @@ public class FileDigestCalculator {
 	public Map<String, Future<FileDigestResult>> reportResult() {
 		Map<String, Future<FileDigestResult>> reportMap = new HashMap<>();
 		synchronized (resultMap) {
+			LOGGER.debug("Result map size: " + resultMap.size());
 			resultMap.forEach((id, result) -> {
 				if (result.isDone()) {
 					reportMap.put(id, result);
@@ -91,10 +98,11 @@ public class FileDigestCalculator {
 			});
 			reportMap.forEach((id, result) -> resultMap.remove(id));
 		}
+		LOGGER.debug("Done result map size: " + reportMap.size());
 		if (!reportMap.isEmpty()) {
-			synchronized (progressMap) {
-				reportMap.forEach((id, result) -> progressMap.remove(id));
-			}
+			progressLock.lock();
+			reportMap.forEach((id, result) -> progressMap.remove(id));
+			progressLock.unlock();
 		}
 		return reportMap;
 	}
@@ -104,18 +112,23 @@ public class FileDigestCalculator {
 	 */
 	public Map<String, FileProgress> reportProgress() {
 		Map<String, FileProgress> reportMap = new HashMap<>();
-		synchronized (progressMap) {
-			progressMap.forEach((id, progress) -> reportMap.put(id, progress));
-		}
+		
+		progressLock.lock();
+		LOGGER.debug("Progress map size: " + progressMap.size());
+		progressMap.forEach((id, progress) -> reportMap.put(id, progress));
+		progressLock.unlock();
+		
 		return reportMap;
 	}
 
 	protected void onProgressUpdated(String fileId, long processed, long total) {
-		synchronized (progressMap) {
-			FileProgress progress = new FileProgress();
-			progress.setProcessed(processed);
-			progress.setTotal(total);
-			progressMap.put(fileId, progress);	
+		FileProgress progress = new FileProgress();
+		progress.setProcessed(processed);
+		progress.setTotal(total);
+
+		if (progressLock.tryLock()) {
+			progressMap.put(fileId, progress);
+			progressLock.unlock();
 		}
 	}
 
@@ -133,8 +146,8 @@ public class FileDigestCalculator {
 				fileDigest.update(buffer, 0, readLength);
 
 				updatedLength += readLength;
-				//LOGGER.debug("Calculate " + updatedLength + " bytes (total " + fileLength + " bytes).");
 				
+				LOGGER.debug("Update progress: " + fileId);				
 				onProgressUpdated(fileId, updatedLength, fileLength);
 			}
 
