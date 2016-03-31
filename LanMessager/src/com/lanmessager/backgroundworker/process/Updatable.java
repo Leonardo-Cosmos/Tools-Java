@@ -1,6 +1,6 @@
 package com.lanmessager.backgroundworker.process;
 
-public interface Status<S> {
+interface Updatable<S> {
 	void update(S value);
 	S get();
 }

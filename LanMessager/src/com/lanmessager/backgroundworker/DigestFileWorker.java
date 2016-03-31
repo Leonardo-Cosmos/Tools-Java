@@ -1,19 +1,18 @@
 package com.lanmessager.backgroundworker;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
 import javax.swing.SwingWorker;
 
 import org.apache.log4j.Logger;
 
+import com.lanmessager.backgroundworker.process.Report;
+import com.lanmessager.backgroundworker.process.ResultReport;
+import com.lanmessager.backgroundworker.process.StatusReport;
 import com.lanmessager.file.FileDigestCalculator;
 import com.lanmessager.file.FileDigestResult;
 
@@ -80,22 +79,21 @@ public class DigestFileWorker {
 	public void cancel(String fileId) {
 		calculator.cancel(fileId);
 	}
+	
+	public void shutdown() {
+		calculator.shutdown();
+	}
 
-	protected void onDone(String fileId, Future<FileDigestResult> result) {
+	protected void onDone(String fileId, ResultReport<String, FileDigestResult> result) {
 		if (completedListeners != null) {
 			FileCompletedEvent event = new FileCompletedEvent(this);
 			event.setFileId(fileId);
-
-			if (!result.isDone()) {
-				LOGGER.warn("An unfinished task is reported: " + fileId);
-				return;
-			}
 
 			if (result.isCancelled()) {
 				event.setCancelled(true);
 			} else {
 				try {
-					event.setFileDigestResult(result.get());
+					event.setFileDigestResult(result.getResult());
 				} catch (CancellationException ex) {
 					LOGGER.info("Task is cancelled: " + fileId);
 					return;
@@ -129,7 +127,7 @@ public class DigestFileWorker {
 		}
 	}
 
-	private class DigestFileMonitorSwingWorker extends SwingWorker<Void, FileReport> {
+	private class DigestFileMonitorSwingWorker extends SwingWorker<Void, Report<String>> {
 		private static final int REPORT_TIME_INTERVAL = 1000;
 
 		@Override
@@ -148,30 +146,9 @@ public class DigestFileWorker {
 				
 				LOGGER.debug("Background thread is working.");
 				
-				Map<String, FileProgress> progressMap = calculator.reportProgress();
-				Map<String, Future<FileDigestResult>> resultMap = calculator.reportResult();
-
-				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size());
-
-				if (progressMap.size() > 0) {
-					progressMap.forEach((fileId, progress) -> {
-						FileProgressReport report = new FileProgressReport();
-						report.setFileId(fileId);
-						report.setProgress(progress);
-						reportList.add(report);
-					});
-				}
-				
-				if (resultMap.size() > 0) {
-					resultMap.forEach((fileId, result) -> {
-						FileResultReport report = new FileResultReport();
-						report.setFileId(fileId);
-						report.setResult(result);
-						reportList.add(report);
-					});
-				}
-
-				FileReport[] reports = new FileReport[reportList.size()];
+				List<Report<String>> reportList = calculator.report();
+				@SuppressWarnings("unchecked")
+				Report<String>[] reports = new Report[reportList.size()];
 				reportList.toArray(reports);
 				publish(reports);
 
@@ -180,17 +157,19 @@ public class DigestFileWorker {
 		}
 
 		@Override
-		protected void process(List<FileReport> chunks) {
+		protected void process(List<Report<String>> chunks) {
 			super.process(chunks);
 
 			chunks.forEach(report -> {
-				if (report instanceof FileResultReport) {
-					FileResultReport resultReport = (FileResultReport) report;
-					onDone(resultReport.getFileId(), resultReport.getResult());
-				} else if (report instanceof FileProgressReport) {
-					FileProgressReport progressReport = (FileProgressReport) report;
-					String fileId = progressReport.getFileId();
-					FileProgress progress = progressReport.getProgress();
+				if (report instanceof ResultReport) {
+					@SuppressWarnings("unchecked")
+					ResultReport<String, FileDigestResult> resultReport = (ResultReport<String, FileDigestResult>) report;
+					onDone(resultReport.getKey(), resultReport);
+				} else if (report instanceof StatusReport) {
+					@SuppressWarnings("unchecked")
+					StatusReport<String, FileProgress> statusReport = (StatusReport<String, FileProgress>) report;
+					String fileId = statusReport.getKey();
+					FileProgress progress = statusReport.getStatus();
 					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
 				} else {
 

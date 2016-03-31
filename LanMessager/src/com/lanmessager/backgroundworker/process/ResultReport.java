@@ -6,15 +6,16 @@ public class ResultReport<K, V> extends Report<K> {
 	
 	private Exception cause;
 	
-	private boolean isDone = false;
-	
 	private boolean isCancelled = false;
 	
 	ResultReport(K key) {
 		super(key);
 	}
 	
-	public V getResult() {
+	public V getResult() throws Exception {
+		if (null != cause) {
+			throw cause;
+		}
 		return result;
 	}
 
@@ -28,14 +29,6 @@ public class ResultReport<K, V> extends Report<K> {
 
 	void setCause(Exception failureCause) {
 		this.cause = failureCause;
-	}
-
-	public boolean isDone() {
-		return isDone;
-	}
-
-	void setDone(boolean isDone) {
-		this.isDone = isDone;
 	}
 
 	public boolean isCancelled() {
