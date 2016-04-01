@@ -14,6 +14,7 @@ public class ReceiveFilePanel extends FileProcessPanel {
 	private static final String STATUS_LABEL_TEXT_FAIL = "Receive file failed: %s";
 	private static final String STATUS_LABEL_TEXT_CANCEL = "Receiving file canceled: %s";
 	
+	// XXX Support receive button in panel.
 	public ReceiveFilePanel(String fileName) {
 		super(fileName);
 	}
