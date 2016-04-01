@@ -268,7 +268,7 @@ public class MainFrame extends JFrame {
 			String fileId = event.getFileId();
 			DigestFileTask task = digestFileTaskMap.get(fileId);
 			if (task == null) {
-				LOGGER.warn("Digest file task is not found:" + fileId);
+				LOGGER.warn("Digest file task is not found: " + fileId);
 				return;
 			}
 			
@@ -339,6 +339,8 @@ public class MainFrame extends JFrame {
 		chatReceiver.stop();
 		
 		fileReceiveWorker.stopReceiveServer();
+		
+		digestWorker.shutdown();
 	}
 
 	private void addFriend(String name, String address) {
