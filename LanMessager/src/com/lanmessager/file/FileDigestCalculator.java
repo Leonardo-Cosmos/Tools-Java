@@ -12,7 +12,7 @@ import com.lanmessager.backgroundworker.process.Processor;
 import com.lanmessager.backgroundworker.process.Task;
 
 public class FileDigestCalculator extends Processor<String, FileDigestResult, FileProgress> {
-	private Logger LOGGER = Logger.getLogger(FileDigestResult.class.getSimpleName());
+	private Logger LOGGER = Logger.getLogger(FileDigestCalculator.class.getSimpleName());
 
 	private static final int BUFFER_LENGTH = 0x1000;
 
