@@ -42,17 +42,20 @@ public class TaskExecutor<K, V, S> {
 	}
 	
 	public void cancel(K key) {
-		Future<V> result = null;
-		Task<V, S> task = null;
+		Submission<V, S> submission = null;
 		synchronized (submissionMap) {
 			if (!submissionMap.containsKey(key)) {
 				LOGGER.warn("Task doesn't exist: " + key);
 				return;
 			}
-			Submission<V, S> submission = submissionMap.get(key);
-			result = submission.getResult();
-			task = submission.getTask();
+			submission = submissionMap.get(key);
 		}
+		cancel(key, submission);
+	}
+	
+	private void cancel(K key, Submission<V, S> submission) {
+		Future<V> result = submission.getResult();
+		Task<V, S> task = submission.getTask();
 		if (result != null) {
 			// Try to cancel task thread.
 			boolean hasCancelled = result.cancel(true);
@@ -66,11 +69,28 @@ public class TaskExecutor<K, V, S> {
 		}
 	}
 	
+	/**
+	 *  Change key of task. 
+	 */
+	public void changeKey(K oldKey, K key) {
+		synchronized (submissionMap) {
+			Submission<V, S> submission = submissionMap.get(oldKey);
+			if (null == submission) {
+				LOGGER.info("Task doesn't exist: " + oldKey);
+				throw new IllegalArgumentException("oldKey");
+			}
+			if (submissionMap.containsKey(key)) {
+				LOGGER.info("Task exists: " + key);
+				throw new IllegalArgumentException("key");
+			}
+			submissionMap.put(key, submission);
+		}
+	}
+	
 	public void shutdown() {
 		synchronized (submissionMap) {
-			submissionMap.forEach((fileId, submission) -> {
-				submission.getResult().cancel(true);
-				submission.getTask().cancel();
+			submissionMap.forEach((key, submission) -> {
+				cancel(key, submission);
 			});
 		}
 		executorService.shutdown();
