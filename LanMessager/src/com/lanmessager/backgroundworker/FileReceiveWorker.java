@@ -1,10 +1,8 @@
 package com.lanmessager.backgroundworker;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -14,11 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import javax.swing.SwingWorker;
-
 import org.apache.log4j.Logger;
 
 import com.lanmessager.communication.TransferFileServer;
+import com.lanmessager.concurrent.ResultReport;
+import com.lanmessager.concurrent.StatusReport;
+import com.lanmessager.concurrent.SwingMonitor;
+import com.lanmessager.concurrent.TaskExecutor;
 import com.lanmessager.file.FileDigestResult;
 
 public class FileReceiveWorker {
@@ -30,9 +30,7 @@ public class FileReceiveWorker {
 
 	private Future<Void> serverResult;
 
-	private final ReceiveFileMonitorSwingWorker monitor;
-
-	private final Object monitorLock;
+	private final ReceiveFileMonitor monitor;
 
 	private Set<FileCompletedListener> completedListeners;
 
@@ -67,9 +65,7 @@ public class FileReceiveWorker {
 	public FileReceiveWorker() {
 		this.receiveFileTaskMap = new HashMap<>();
 		this.server = new TransferFileServer();
-		this.monitorLock = new Object();
-		this.monitor = new ReceiveFileMonitorSwingWorker();
-		this.monitor.execute();
+		this.monitor = new ReceiveFileMonitor(server);
 	}
 
 	public void startReceiveServer() {
@@ -124,149 +120,71 @@ public class FileReceiveWorker {
 		}
 		ReceiveFileTask task = receiveFileTaskMap.get(fileId);
 		server.receive(fileId, task.getFile(), task.getFileSize());
-		
-		synchronized (monitorLock) {
-			monitorLock.notify();
-		}
 	}
 
 	public void cancel(String fileId) {
 		server.cancel(fileId);
 	}
 
-	protected void onDone(String fileId, Future<FileDigestResult> result) {
-		if (!receiveFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot find send file task " + fileId);
-			return;
+	private class ReceiveFileMonitor extends SwingMonitor<String, FileDigestResult, FileProgress> {
+
+		public ReceiveFileMonitor(TaskExecutor<String, FileDigestResult, FileProgress> executor) {
+			super(executor);
 		}
-		receiveFileTaskMap.remove(fileId);
 
-		if (completedListeners != null) {
-			FileCompletedEvent event = new FileCompletedEvent(this);
-			event.setFileId(fileId);
-
-			if (!result.isDone()) {
-				LOGGER.warn("An unfinished task is reported: " + fileId);
+		@Override
+		protected void onDone(ResultReport<String, FileDigestResult> report) {
+			String fileId = report.getKey();
+			
+			if (!receiveFileTaskMap.containsKey(fileId)) {
+				LOGGER.warn("Cannot find send file task " + fileId);
 				return;
 			}
+			receiveFileTaskMap.remove(fileId);
 
-			if (result.isCancelled()) {
-				event.setCancelled(true);
-			} else {
-				try {
-					event.setFileDigestResult(result.get());
-				} catch (CancellationException ex) {
-					LOGGER.info("Task is cancelled: " + fileId);
-					return;
-				} catch (InterruptedException ex) {
-					LOGGER.info("Task is interrupted: " + fileId);
-					return;
-				} catch (ExecutionException ex) {
-					event.setFailed(true);
-					event.setCause(ex.getCause());
-				} catch (Exception ex) {
-					event.setFailed(true);
-					event.setCause(ex);
-				}
-			}
+			if (completedListeners != null) {
+				FileCompletedEvent event = new FileCompletedEvent(this);
+				event.setFileId(fileId);
 
-			for (FileCompletedListener listener : completedListeners) {
-				listener.complete(event);
-			}
-		}
-	}
-
-	protected void onProgressUpdated(String fileId, long processed, long total) {
-		if (progressUpdatedListeners != null) {
-			FileProgressUpdatedEvent event = new FileProgressUpdatedEvent(this);
-			event.setFileId(fileId);
-			event.setProcessed(processed);
-			event.setTotal(total);
-			for (FileProgressUpdatedListener listener : progressUpdatedListeners) {
-				listener.updateProgress(event);
-			}
-		}
-	}
-
-	private class ReceiveFileMonitorSwingWorker extends SwingWorker<Void, FileReport> {
-		private static final int REPORT_TIME_INTERVAL = 1000;
-
-		@Override
-		protected Void doInBackground() throws Exception {
-			LOGGER.info("Background thread starts.");
-
-			while (true) {
-				if (server.isIdle()) {
-					// Block monitor thread if calculator is idle.
-					synchronized (monitorLock) {
-						LOGGER.info("Background thread sleeps.");
-						monitorLock.wait();
-						LOGGER.info("Background thread wakes up.");
-					}
-				}
-
-				LOGGER.debug("Background thread is working.");
-				
-				Map<String, FileProgress> progressMap = server.reportProgress();
-				Map<String, Future<FileDigestResult>> resultMap = server.reportResult();
-				
-				List<FileReport> reportList = new ArrayList<>(resultMap.size() + progressMap.size());
-				
-				if (progressMap.size() > 0) {
-					progressMap.forEach((fileId, progress) -> {
-						FileProgressReport report = new FileProgressReport();
-						report.setFileId(fileId);
-						report.setProgress(progress);
-						reportList.add(report);
-					});
-				}
-
-				if (resultMap.size() > 0) {
-					resultMap.forEach((fileId, result) -> {
-						FileResultReport report = new FileResultReport();
-						report.setFileId(fileId);
-						report.setResult(result);
-						reportList.add(report);
-					});
-				}
-
-				FileReport[] reports = new FileReport[reportList.size()];
-				reportList.toArray(reports);
-				publish(reports);
-
-				Thread.sleep(REPORT_TIME_INTERVAL);
-			}
-		}
-
-		@Override
-		protected void process(List<FileReport> chunks) {
-			super.process(chunks);
-
-			chunks.forEach(report -> {
-				if (report instanceof FileResultReport) {
-					FileResultReport resultReport = (FileResultReport) report;
-					onDone(resultReport.getFileId(), resultReport.getResult());
-				} else if (report instanceof FileProgressReport) {
-					FileProgressReport progressReport = (FileProgressReport) report;
-					String fileId = progressReport.getFileId();
-					if (!receiveFileTaskMap.containsKey(fileId)) {
-						LOGGER.info("Cannot find task " + fileId);
-						return;
-					}
-					FileProgress progress = progressReport.getProgress();
-					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
+				if (report.isCancelled()) {
+					event.setCancelled(true);
 				} else {
-
+					try {
+						event.setFileDigestResult(report.getResult());
+					} catch (CancellationException ex) {
+						LOGGER.info("Task is cancelled: " + fileId);
+						return;
+					} catch (InterruptedException ex) {
+						LOGGER.info("Task is interrupted: " + fileId);
+						return;
+					} catch (ExecutionException ex) {
+						event.setFailed(true);
+						event.setCause(ex.getCause());
+					} catch (Exception ex) {
+						event.setFailed(true);
+						event.setCause(ex);
+					}
 				}
-			});
+
+				for (FileCompletedListener listener : completedListeners) {
+					listener.complete(event);
+				}
+			}
 		}
 
 		@Override
-		protected void done() {
-			super.done();
-
-			LOGGER.info("Background thread exits.");
+		protected void onStatusUpdated(StatusReport<String, FileProgress> report) {
+			if (progressUpdatedListeners != null) {
+				FileProgressUpdatedEvent event = new FileProgressUpdatedEvent(this);
+				event.setFileId(report.getKey());
+				event.setProcessed(report.getStatus().getProcessed());
+				event.setTotal(report.getStatus().getTotal());
+				for (FileProgressUpdatedListener listener : progressUpdatedListeners) {
+					listener.updateProgress(event);
+				}
+			}
 		}
+		
 	}
 
 	private class ReceiveFileTask {
