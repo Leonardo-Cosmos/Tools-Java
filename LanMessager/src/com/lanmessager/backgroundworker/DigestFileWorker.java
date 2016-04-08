@@ -2,17 +2,15 @@ package com.lanmessager.backgroundworker;
 
 import java.io.File;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import javax.swing.SwingWorker;
-
 import org.apache.log4j.Logger;
 
-import com.lanmessager.backgroundworker.process.Report;
 import com.lanmessager.backgroundworker.process.ResultReport;
 import com.lanmessager.backgroundworker.process.StatusReport;
+import com.lanmessager.backgroundworker.process.SwingMonitor;
+import com.lanmessager.backgroundworker.process.TaskExecutor;
 import com.lanmessager.file.FileDigestCalculator;
 import com.lanmessager.file.FileDigestResult;
 
@@ -21,9 +19,7 @@ public class DigestFileWorker {
 
 	private final FileDigestCalculator calculator;
 
-	private final DigestFileMonitorSwingWorker monitor;
-	
-	private final Object monitorLock;
+	private final DigestFileMonitor monitor;
 
 	private Set<FileCompletedListener> completedListeners;
 
@@ -57,9 +53,7 @@ public class DigestFileWorker {
 
 	public DigestFileWorker() {
 		this.calculator = new FileDigestCalculator();
-		this.monitorLock = new Object();
-		this.monitor = new DigestFileMonitorSwingWorker();
-		this.monitor.execute();
+		this.monitor = new DigestFileMonitor(calculator);
 	}
 
 	/**
@@ -71,9 +65,6 @@ public class DigestFileWorker {
 	 */
 	public void digest(String fileId, File file) {
 		calculator.digestFile(fileId, file);
-		synchronized (monitorLock) {
-			monitorLock.notify();
-		}
 	}
 
 	public void cancel(String fileId) {
@@ -84,104 +75,56 @@ public class DigestFileWorker {
 		calculator.shutdown();
 	}
 
-	protected void onDone(String fileId, ResultReport<String, FileDigestResult> result) {
-		if (completedListeners != null) {
-			FileCompletedEvent event = new FileCompletedEvent(this);
-			event.setFileId(fileId);
+	private class DigestFileMonitor extends SwingMonitor<String, FileDigestResult, FileProgress> {
 
-			if (result.isCancelled()) {
-				event.setCancelled(true);
-			} else {
-				try {
-					event.setFileDigestResult(result.getResult());
-				} catch (CancellationException ex) {
-					LOGGER.info("Task is cancelled: " + fileId);
-					return;
-				} catch (InterruptedException ex) {
-					LOGGER.info("Task is interrupted: " + fileId);
-					return;
-				} catch (ExecutionException ex) {
-					event.setFailed(true);
-					event.setCause(ex.getCause());
-				} catch (Exception ex) {
-					event.setFailed(true);
-					event.setCause(ex);
-				}
-			}
-
-			for (FileCompletedListener listener : completedListeners) {
-				listener.complete(event);
-			}
+		public DigestFileMonitor(TaskExecutor<String, FileDigestResult, FileProgress> executor) {
+			super(executor);
 		}
-	}
-
-	protected void onProgressUpdated(String fileId, long processed, long total) {
-		if (progressUpdatedListeners != null) {
-			FileProgressUpdatedEvent event = new FileProgressUpdatedEvent(this);
-			event.setFileId(fileId);
-			event.setProcessed(processed);
-			event.setTotal(total);
-			for (FileProgressUpdatedListener listener : progressUpdatedListeners) {
-				listener.updateProgress(event);
-			}
-		}
-	}
-
-	private class DigestFileMonitorSwingWorker extends SwingWorker<Void, Report<String>> {
-		private static final int REPORT_TIME_INTERVAL = 1000;
 
 		@Override
-		protected Void doInBackground() throws Exception {
-			LOGGER.info("Background thread starts.");
+		protected void onDone(ResultReport<String, FileDigestResult> report) {
+			if (completedListeners != null) {
+				String fileId = report.getKey();
+				FileCompletedEvent event = new FileCompletedEvent(this);
+				event.setFileId(fileId);
 
-			while (true) {
-				if (calculator.isIdle()) {
-					// Block monitor thread if calculator is idle.
-					synchronized (monitorLock) {
-						LOGGER.info("Background thread sleeps.");
-						monitorLock.wait();
-						LOGGER.info("Background thread wakes up.");
+				if (report.isCancelled()) {
+					event.setCancelled(true);
+				} else {
+					try {
+						event.setFileDigestResult(report.getResult());
+					} catch (CancellationException ex) {
+						LOGGER.info("Task is cancelled: " + fileId);
+						return;
+					} catch (InterruptedException ex) {
+						LOGGER.info("Task is interrupted: " + fileId);
+						return;
+					} catch (ExecutionException ex) {
+						event.setFailed(true);
+						event.setCause(ex.getCause());
+					} catch (Exception ex) {
+						event.setFailed(true);
+						event.setCause(ex);
 					}
 				}
-				
-				LOGGER.debug("Background thread is working.");
-				
-				List<Report<String>> reportList = calculator.report();
-				@SuppressWarnings("unchecked")
-				Report<String>[] reports = new Report[reportList.size()];
-				reportList.toArray(reports);
-				publish(reports);
 
-				Thread.sleep(REPORT_TIME_INTERVAL);
+				for (FileCompletedListener listener : completedListeners) {
+					listener.complete(event);
+				}
 			}
 		}
 
 		@Override
-		protected void process(List<Report<String>> chunks) {
-			super.process(chunks);
-
-			chunks.forEach(report -> {
-				if (report instanceof ResultReport) {
-					@SuppressWarnings("unchecked")
-					ResultReport<String, FileDigestResult> resultReport = (ResultReport<String, FileDigestResult>) report;
-					onDone(resultReport.getKey(), resultReport);
-				} else if (report instanceof StatusReport) {
-					@SuppressWarnings("unchecked")
-					StatusReport<String, FileProgress> statusReport = (StatusReport<String, FileProgress>) report;
-					String fileId = statusReport.getKey();
-					FileProgress progress = statusReport.getStatus();
-					onProgressUpdated(fileId, progress.getProcessed(), progress.getTotal());
-				} else {
-
+		protected void onStatusUpdated(StatusReport<String, FileProgress> report) {
+			if (progressUpdatedListeners != null) {				
+				FileProgressUpdatedEvent event = new FileProgressUpdatedEvent(this);
+				event.setFileId(report.getKey());
+				event.setProcessed(report.getStatus().getProcessed());
+				event.setTotal(report.getStatus().getTotal());
+				for (FileProgressUpdatedListener listener : progressUpdatedListeners) {
+					listener.updateProgress(event);
 				}
-			});
-		}
-
-		@Override
-		protected void done() {
-			super.done();
-
-			LOGGER.info("Background thread exits.");
+			}
 		}
 	}
 }

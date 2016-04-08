@@ -8,27 +8,36 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
-public class Processor<K, V, S> {
-	private static final Logger LOGGER = Logger.getLogger(Processor.class.getSimpleName());
+public class TaskExecutor<K, V, S> {
+	private static final Logger LOGGER = Logger.getLogger(TaskExecutor.class.getSimpleName());
 	
-	private final ExecutorService executor;
+	private final ExecutorService executorService;
 	
 	private final Map<K, Submission<V, S>> submissionMap;
-		
-	public Processor(ExecutorService executor) {
-		this.executor = executor;
-		
-		submissionMap = new HashMap<>();
+	
+	private Monitor<K, V, S> monitor;
+	
+	void setMonitor(Monitor<K, V, S> monitor) {
+		this.monitor = monitor;
+	}
+
+	public TaskExecutor(ExecutorService executor) {
+		this.executorService = executor;
+		this.submissionMap = new HashMap<>();
 	}
 	
 	public void submit(K key, Task<V, S> task) {
-		task.setStatus(new FinalStatus<>());
-		Future<V> result = executor.submit(task);
+		LOGGER.debug("New task: " + key);
 		synchronized (submissionMap) {
+			task.setStatus(new FinalStatus<>());
+			Future<V> result = executorService.submit(task);
 			if (submissionMap.containsKey(key)) {
 				LOGGER.warn("Duplicated task: " + key);
 			}			
 			submissionMap.put(key, new Submission<>(task, result));
+		}
+		if (null != monitor) {
+			monitor.wakeup();
 		}
 	}
 	
@@ -64,7 +73,7 @@ public class Processor<K, V, S> {
 				submission.getTask().cancel();
 			});
 		}
-		executor.shutdown();
+		executorService.shutdown();
 	}
 	
 	public boolean isIdle() {
