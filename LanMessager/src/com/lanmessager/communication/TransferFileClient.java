@@ -34,7 +34,7 @@ public class TransferFileClient extends TaskExecutor<String, FileDigestResult, F
 	
 	public static final byte ID_END = '\0';
 
-	private static final String CLASS_NAME = FileDigestCalculator.class.getSimpleName();
+	private static final String CLASS_NAME = TransferFileClient.class.getSimpleName();
 	
 	private static final int BUFFER_LENGTH = 0x1000;
 	
