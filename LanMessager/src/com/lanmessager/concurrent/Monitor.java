@@ -1,4 +1,4 @@
-package com.lanmessager.backgroundworker.process;
+package com.lanmessager.concurrent;
 
 public abstract class Monitor<K, V, S> {
 	

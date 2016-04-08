@@ -7,10 +7,10 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import org.apache.log4j.Logger;
 
-import com.lanmessager.backgroundworker.process.ResultReport;
-import com.lanmessager.backgroundworker.process.StatusReport;
-import com.lanmessager.backgroundworker.process.SwingMonitor;
-import com.lanmessager.backgroundworker.process.TaskExecutor;
+import com.lanmessager.concurrent.ResultReport;
+import com.lanmessager.concurrent.StatusReport;
+import com.lanmessager.concurrent.SwingMonitor;
+import com.lanmessager.concurrent.TaskExecutor;
 import com.lanmessager.file.FileDigestCalculator;
 import com.lanmessager.file.FileDigestResult;
 

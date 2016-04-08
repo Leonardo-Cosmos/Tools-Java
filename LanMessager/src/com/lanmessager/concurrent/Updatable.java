@@ -1,4 +1,4 @@
-package com.lanmessager.backgroundworker.process;
+package com.lanmessager.concurrent;
 
 interface Updatable<S> {
 	void update(S value);

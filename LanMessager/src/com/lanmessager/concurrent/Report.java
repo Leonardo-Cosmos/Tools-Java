@@ -1,4 +1,4 @@
-package com.lanmessager.backgroundworker.process;
+package com.lanmessager.concurrent;
 
 public class Report<K> {
 	private K key;

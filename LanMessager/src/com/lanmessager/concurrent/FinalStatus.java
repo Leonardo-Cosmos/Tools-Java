@@ -1,4 +1,4 @@
-package com.lanmessager.backgroundworker.process;
+package com.lanmessager.concurrent;
 
 class FinalStatus<S> implements Updatable<S> {
 

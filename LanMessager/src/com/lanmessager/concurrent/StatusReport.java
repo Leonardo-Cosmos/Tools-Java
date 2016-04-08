@@ -1,4 +1,4 @@
-package com.lanmessager.backgroundworker.process;
+package com.lanmessager.concurrent;
 
 public class StatusReport<K, S> extends Report<K> {
 	private S status;

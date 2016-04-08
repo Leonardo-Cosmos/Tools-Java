@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Logger;
 
 import com.lanmessager.backgroundworker.FileProgress;
-import com.lanmessager.backgroundworker.process.TaskExecutor;
-import com.lanmessager.backgroundworker.process.Task;
+import com.lanmessager.concurrent.Task;
+import com.lanmessager.concurrent.TaskExecutor;
 
 import sun.awt.AppContext;
 
