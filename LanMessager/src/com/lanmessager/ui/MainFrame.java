@@ -1,13 +1,21 @@
 package com.lanmessager.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
@@ -56,14 +64,26 @@ public class MainFrame extends JFrame {
 
 	private static final Logger LOGGER = Logger.getLogger(MainFrame.class.getSimpleName());
 
+	private static final String PROP_FILE_PATH = "UserConfig.properties";
+	private static final String PROP_WINDOW_SIZE_WIDTH = "WindowSizeWidth";
+	private static final String PROP_WINDOW_SIZE_HEIGHT = "WindowSizeHeight";
+	private static final String PROP_WINDOW_LOCATION_X = "WindowLocationX";
+	private static final String PROP_WINDOW_LOCATION_Y = "WindowLocationY";
+	private static final String PROP_SPLIT_PANE_DIVIDER_LOCATION = "SplitPaneDividerLocation";
+	private static final String PROP_OPEN_FILE_PATH = "OpenFilePath";
+	private static final String PROP_SAVE_FILE_PATH = "SaveFilePath";
+	
+	private static final String DEFAULT_SIZE_WIDTH = "800";
+	private static final String DEFAULT_SIZE_HEIGHT = "600";
+	private static final String DEFAULT_LOCATION_X = "200";
+	private static final String DEFAULT_LOCATION_Y = "100";
+	private static final String DEFAULT_SPLIT_PANE_DIVIDER_LOCATION = "100";
+	
 	private static final String FILE_MENU_TEXT = "File";
 	private static final String SEND_FILE_MENU_ITEM_TEXT = "Send file to friend...";
 	private static final String DIGEST_FILE_MENU_ITEM_TEXT = "Digest file...";
 	private static final String SEND_FILE_POPUP_MENU_ITEM_TEXT = "Send file...";
 
-	private int frameWidth = 800;
-	private int frameHeight = 600;
-	private int splitPaneDividerLocation = 100;
 
 	private final JFileChooser openFileChooser = new JFileChooser();
 	private final JFileChooser saveFileChooser = new JFileChooser();
@@ -71,6 +91,7 @@ public class MainFrame extends JFrame {
 	private JPopupMenu popupMenu;
 	private JPanel chatPanel;
 	private JList<FriendInfo> friendList;
+	private JSplitPane splitPane;
 
 	private DefaultListModel<FriendInfo> friendListModel = new DefaultListModel<>();
 	private Map<String, DigestFileTask> digestFileTaskMap = new HashMap<>();
@@ -93,15 +114,111 @@ public class MainFrame extends JFrame {
 
 		initComponents();
 
-		initWorker();
-
 		addWindowListener(new WindowAdapter() {
+
+			@Override
+			public void windowOpened(WindowEvent e) {
+				initWorker();
+				
+				/* Loads properties from file. */
+				Properties properties = new Properties();
+				
+				File propFile = new File(PROP_FILE_PATH);
+				if (!propFile.exists()) {
+					return;
+				}
+				try {
+					FileInputStream input = new FileInputStream(propFile);
+					properties.load(input);
+				} catch (IOException ex) {
+					LOGGER.error("Load user configure failed.", ex);
+				}
+				
+				/* Loads properties from object. */
+				try {
+					int width = Integer.parseInt(properties.getProperty(PROP_WINDOW_SIZE_WIDTH, DEFAULT_SIZE_WIDTH));
+					int height = Integer.parseInt(properties.getProperty(PROP_WINDOW_SIZE_HEIGHT, DEFAULT_SIZE_HEIGHT));
+					setSize(width, height);
+				} catch (NumberFormatException ex) {
+					LOGGER.error("Parse size properties failed.", ex);
+
+					setSize(Integer.parseInt(DEFAULT_SIZE_WIDTH), Integer.parseInt(DEFAULT_SIZE_HEIGHT));
+				}
+
+				try {
+					int x = Integer.parseInt(properties.getProperty(PROP_WINDOW_LOCATION_X, DEFAULT_LOCATION_X));
+					int y = Integer.parseInt(properties.getProperty(PROP_WINDOW_LOCATION_Y, DEFAULT_LOCATION_Y));
+					setLocation(x, y);
+				} catch (NumberFormatException ex) {
+					LOGGER.error("Parse location properties failed.", ex);
+
+					setLocation(Integer.parseInt(DEFAULT_LOCATION_X), Integer.parseInt(DEFAULT_LOCATION_Y));
+				}
+
+				try {
+					int location = Integer.parseInt(properties.getProperty(PROP_SPLIT_PANE_DIVIDER_LOCATION,
+							DEFAULT_SPLIT_PANE_DIVIDER_LOCATION));
+					splitPane.setDividerLocation(location);
+				} catch (NumberFormatException ex) {
+					LOGGER.error("Parse split pane property failed.", ex);
+					splitPane.setDividerLocation(Integer.parseInt(DEFAULT_SPLIT_PANE_DIVIDER_LOCATION));
+				}
+				
+				String selectedOpenFilePath = properties.getProperty(PROP_OPEN_FILE_PATH);
+				if (null != selectedOpenFilePath) {
+					openFileChooser.setSelectedFile(new File(selectedOpenFilePath));
+				}
+				
+				String selectedSaveFilePath = properties.getProperty(PROP_SAVE_FILE_PATH);
+				if (null != selectedSaveFilePath) {
+					saveFileChooser.setSelectedFile(new File(selectedSaveFilePath));
+				}
+			}
+			
 			@Override
 			public void windowClosing(WindowEvent e) {
-				super.windowClosing(e);
-
 				destroyWorker();
 
+				/* Saves properties to object. */
+				Properties properties = new Properties();
+				
+				Dimension size = getSize();
+				properties.setProperty(PROP_WINDOW_SIZE_WIDTH, Integer.toString(size.width));
+				properties.setProperty(PROP_WINDOW_SIZE_HEIGHT, Integer.toString(size.height));
+				
+				Point location = getLocation();
+				properties.setProperty(PROP_WINDOW_LOCATION_X, Integer.toString(location.x));
+				properties.setProperty(PROP_WINDOW_LOCATION_Y, Integer.toString(location.y));
+				
+				int dividerLocation = splitPane.getDividerLocation();
+				properties.setProperty(PROP_SPLIT_PANE_DIVIDER_LOCATION, Integer.toString(dividerLocation));
+				
+				File selectedOpenFile = openFileChooser.getSelectedFile();
+				if (null != selectedOpenFile) {
+					properties.setProperty(PROP_OPEN_FILE_PATH, selectedOpenFile.getAbsolutePath());
+				}
+				
+				File selectedSaveFile = saveFileChooser.getSelectedFile();
+				if (null != selectedSaveFile) {
+					properties.setProperty(PROP_SAVE_FILE_PATH, selectedSaveFile.getAbsolutePath());
+				}
+				
+				/* Saves properties to file. */
+				File propFile = new File(PROP_FILE_PATH);
+				try {
+					if (!propFile.exists()) {
+						propFile.createNewFile();
+					}
+					OutputStream output = new FileOutputStream(propFile);
+					properties.store(output, null);
+				} catch (IOException ex) {
+					LOGGER.error("Save user configure failed.", ex);
+					JOptionPane.showConfirmDialog(MainFrame.this, "Save user configure failed.");
+				}
+			}
+			
+			@Override
+			public void windowClosed(WindowEvent e) {
 				System.exit(0);
 			}
 		});
@@ -141,7 +258,6 @@ public class MainFrame extends JFrame {
 	}
 
 	private void initComponents() {
-		setSize(frameWidth, frameHeight);
 		setLocationRelativeTo(null);
 		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 		setLayout(new BorderLayout());
@@ -174,7 +290,7 @@ public class MainFrame extends JFrame {
 		});
 		popupMenu.add(sendPopupMenuItem);
 
-		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+		splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
 
 		friendList = new JList<>(friendListModel);
 		friendList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
@@ -202,7 +318,6 @@ public class MainFrame extends JFrame {
 		splitPane.add(scrollPane, JSplitPane.RIGHT);
 
 		// splitPane.setDividerSize(20);
-		splitPane.setDividerLocation(splitPaneDividerLocation);
 		splitPane.setOneTouchExpandable(true);
 
 		add(splitPane, BorderLayout.CENTER);
