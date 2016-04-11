@@ -52,8 +52,9 @@ public class DigestFileWorker {
 	}
 
 	public DigestFileWorker() {
-		this.calculator = new FileDigestCalculator();
-		this.monitor = new DigestFileMonitor(calculator);
+		calculator = new FileDigestCalculator();
+		monitor = new DigestFileMonitor(calculator);
+		monitor.execute();
 	}
 
 	/**
@@ -72,6 +73,7 @@ public class DigestFileWorker {
 	}
 	
 	public void shutdown() {
+		monitor.shutdown();
 		calculator.shutdown();
 	}
 

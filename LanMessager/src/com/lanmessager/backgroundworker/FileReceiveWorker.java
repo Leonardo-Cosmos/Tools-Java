@@ -63,9 +63,9 @@ public class FileReceiveWorker {
 	}
 
 	public FileReceiveWorker() {
-		this.receiveFileTaskMap = new HashMap<>();
-		this.server = new TransferFileServer();
-		this.monitor = new ReceiveFileMonitor(server);
+		receiveFileTaskMap = new HashMap<>();
+		server = new TransferFileServer();
+		monitor = new ReceiveFileMonitor(server);
 	}
 
 	public void startReceiveServer() {
@@ -124,6 +124,11 @@ public class FileReceiveWorker {
 
 	public void cancel(String fileId) {
 		server.cancel(fileId);
+	}
+	
+	public void shutdown() {
+		monitor.shutdown();
+		server.shutdown();
 	}
 
 	private class ReceiveFileMonitor extends SwingMonitor<String, FileDigestResult, FileProgress> {

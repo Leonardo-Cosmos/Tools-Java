@@ -11,33 +11,52 @@ public abstract class SwingMonitor<K, V, S> extends Monitor<K, V, S> {
 	
 	private static final int REPORT_TIME_INTERVAL = 1000;
 	
-	private final Object monitorLock;
+	private final MonitorSwingWorker worker;
 	
 	private TaskExecutor<K, V, S> executor;
 	
 	public SwingMonitor(TaskExecutor<K, V, S> executor) {
 		this.executor = executor;
-		this.monitorLock = new Object();
-		MonitorSwingWorker worker = new MonitorSwingWorker();
-		worker.execute();
+		this.worker = new MonitorSwingWorker();
 		
 		executor.setMonitor(this);
 	}
 	
+	public void execute() {
+		worker.execute();
+	}
+	
+	public void shutdown() {
+		worker.shutdown();
+	}
+	
 	@Override
 	void wakeup() {
-		synchronized (monitorLock) {
-			monitorLock.notify();
-		}
+		worker.wakeup();
 	}
 	
 	private class MonitorSwingWorker extends SwingWorker<Void, Report<K>> {
-
+		
+		private final Object monitorLock  = new Object();
+		
+		private boolean isShutdown = false;
+		
+		public void shutdown() {
+			isShutdown = true;
+			wakeup();
+		}
+		
+		public void wakeup() {
+			synchronized (monitorLock) {
+				monitorLock.notify();
+			}
+		}
+		
 		@Override
 		protected Void doInBackground() throws Exception {
 			LOGGER.info("Monitor thread starts.");
 
-			while (true) {
+			while (!isShutdown) {
 				if (executor.isIdle()) {
 					// Block monitor thread if processor is idle.
 					synchronized (monitorLock) {
@@ -57,6 +76,7 @@ public abstract class SwingMonitor<K, V, S> extends Monitor<K, V, S> {
 
 				Thread.sleep(REPORT_TIME_INTERVAL);
 			}
+			return null;
 		}
 
 		@Override

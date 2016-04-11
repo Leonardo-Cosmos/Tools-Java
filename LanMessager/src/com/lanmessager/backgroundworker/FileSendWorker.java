@@ -56,9 +56,10 @@ public class FileSendWorker {
 	}
 
 	public FileSendWorker() {
-		this.sendFileTaskMap = new HashMap<>();
-		this.client = new TransferFileClient();
-		this.monitor = new SendFileMonitor(client);
+		sendFileTaskMap = new HashMap<>();
+		client = new TransferFileClient();
+		monitor = new SendFileMonitor(client);
+		monitor.execute();
 	}
 
 	public void register(String receiverAddress, String fileId, File file, long fileSize) {
@@ -93,6 +94,11 @@ public class FileSendWorker {
 
 	public void cancel(String fileId) {
 		client.cancel(fileId);
+	}
+	
+	public void shutdown() {
+		monitor.shutdown();
+		client.shutdown();
 	}
 
 	private class SendFileMonitor extends SwingMonitor<String, FileDigestResult, FileProgress> {

@@ -454,6 +454,9 @@ public class MainFrame extends JFrame {
 		chatReceiver.stop();
 		
 		fileReceiveWorker.stopReceiveServer();
+		fileReceiveWorker.shutdown();
+		
+		fileSendWorker.shutdown();
 		
 		digestWorker.shutdown();
 	}
