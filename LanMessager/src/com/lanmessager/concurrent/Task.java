@@ -2,6 +2,12 @@ package com.lanmessager.concurrent;
 
 import java.util.concurrent.Callable;
 
+/**
+ * An abstract class that defines basic methods used by {@link TaskExecutor} to handle thread.
+ *
+ * @param <V> The result type returned by {@link Task}.
+ * @param <S> he status type updated by {@link Task}.
+ */
 public abstract class Task<V, S> implements Callable<V> {
 	
 	private volatile boolean isStarted = false;

@@ -8,6 +8,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import org.apache.log4j.Logger;
 
+/**
+ * An TaskExecutor is an wrap of {@link ExecutorService} that accept {@link Task} only.
+ * All {@link Task} can be retrieved by a key.
+ * Every task can report status during execution, and report result when execution is done.
+ * Report will be merged to a collection so that it will be convenient to display in UI.
+ *
+ * @param <K> The key type used to retrieve {@link Task}.
+ * @param <V> The result type returned by {@link Task}.
+ * @param <S> The status type updated by {@link Task}.
+ */
 public class TaskExecutor<K, V, S> {
 	private static final Logger LOGGER = Logger.getLogger(TaskExecutor.class.getSimpleName());
 	
