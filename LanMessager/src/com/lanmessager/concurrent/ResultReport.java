@@ -1,5 +1,11 @@
 package com.lanmessager.concurrent;
 
+/**
+ * Represents information returned by {@link Task}.
+ *
+ * @param <K> The key type used to retrieve {@link Task}.
+ * @param <V> The result type returned by {@link Task}.
+ */
 public class ResultReport<K, V> extends Report<K> {
 
 	private V result;

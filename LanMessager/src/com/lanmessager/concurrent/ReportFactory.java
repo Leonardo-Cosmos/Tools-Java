@@ -4,6 +4,10 @@ import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
+/**
+ * Generates {@link Report} by checking {@link Task}.
+ *
+ */
 class ReportFactory {
 	private final static Logger LOGGER = Logger.getLogger(ReportFactory.class.getSimpleName());
 	

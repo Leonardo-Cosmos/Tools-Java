@@ -6,6 +6,13 @@ import javax.swing.SwingWorker;
 
 import org.apache.log4j.Logger;
 
+/**
+ * Implements mechanism of interaction with Swing for {@link Monitor}. 
+ *
+ * @param <K> The key type used to retrieve {@link Task}.
+ * @param <V> The result type returned by {@link Task}.
+ * @param <S> The status type updated by {@link Task}.
+ */
 public abstract class SwingMonitor<K, V, S> extends Monitor<K, V, S> {
 	private static final Logger LOGGER = Logger.getLogger(SwingMonitor.class.getSimpleName());
 	
