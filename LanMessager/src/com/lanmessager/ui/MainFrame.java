@@ -124,14 +124,13 @@ public class MainFrame extends JFrame {
 				Properties properties = new Properties();
 				
 				File propFile = new File(PROP_FILE_PATH);
-				if (!propFile.exists()) {
-					return;
-				}
-				try {
-					FileInputStream input = new FileInputStream(propFile);
-					properties.load(input);
-				} catch (IOException ex) {
-					LOGGER.error("Load user configure failed.", ex);
+				if (propFile.exists()) {
+					try {
+						FileInputStream input = new FileInputStream(propFile);
+						properties.load(input);
+					} catch (IOException ex) {
+						LOGGER.error("Load user configure failed.", ex);
+					}
 				}
 				
 				/* Loads properties from object. */
