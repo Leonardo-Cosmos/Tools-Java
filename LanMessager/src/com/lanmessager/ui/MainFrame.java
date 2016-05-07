@@ -391,7 +391,7 @@ public class MainFrame extends JFrame {
 		
 		fileSendWorker.addCompletedListener(event -> {
 			String fileId = event.getFileId();
-			if (sendFilePanelMap.containsKey(fileId)) {
+			if (!sendFilePanelMap.containsKey(fileId)) {
 				LOGGER.warn("Cannot find send file panel: " + fileId);
 				return;
 			}
@@ -406,7 +406,7 @@ public class MainFrame extends JFrame {
 		});
 		fileSendWorker.addProgressUpdatedListeners(event -> {
 			String fileId = event.getFileId();
-			if (sendFilePanelMap.containsKey(fileId)) {
+			if (!sendFilePanelMap.containsKey(fileId)) {
 				LOGGER.warn("Cannot find send file panel: " + fileId);
 				return;
 			}
@@ -416,7 +416,7 @@ public class MainFrame extends JFrame {
 		
 		fileReceiveWorker.addCompletedListener(event -> {
 			String fileId = event.getFileId();
-			if (receiveFilePanelMap.containsKey(fileId)) {
+			if (!receiveFilePanelMap.containsKey(fileId)) {
 				LOGGER.warn("Cannot find receive file panel: " + fileId);
 				return;
 			}
@@ -431,7 +431,7 @@ public class MainFrame extends JFrame {
 		});
 		fileReceiveWorker.addProgressUpdatedListeners(event -> {
 			String fileId = event.getFileId();
-			if (receiveFilePanelMap.containsKey(fileId)) {
+			if (!receiveFilePanelMap.containsKey(fileId)) {
 				LOGGER.warn("Cannot find receive file panel: " + fileId);
 				return;
 			}
@@ -567,7 +567,7 @@ public class MainFrame extends JFrame {
 	 * Abort sending file when remote host reject.
 	 */
 	private void abortSendFile(String fileId) {		
-		if (sendFilePanelMap.containsKey(fileId)) {
+		if (!sendFilePanelMap.containsKey(fileId)) {
 			LOGGER.warn("Cannot find send file panel: " + fileId);
 			return;
 		}
@@ -624,7 +624,7 @@ public class MainFrame extends JFrame {
 	 * Abort receiving file and notify remote host abort sending.
 	 */
 	private void abortReceiveFile(String fileId, String senderAddress) {
-		if (receiveFilePanelMap.containsKey(fileId)) {
+		if (!receiveFilePanelMap.containsKey(fileId)) {
 			LOGGER.warn("Cannot find receive file panel: " + fileId);
 			return;
 		}

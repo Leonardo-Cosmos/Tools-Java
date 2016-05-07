@@ -84,15 +84,17 @@ public class TaskExecutor<K, V, S> {
 	 */
 	public void changeKey(K oldKey, K key) {
 		synchronized (submissionMap) {
-			Submission<V, S> submission = submissionMap.get(oldKey);
-			if (null == submission) {
+			if (!submissionMap.containsKey(oldKey)) {
 				LOGGER.info("Task doesn't exist: " + oldKey);
 				throw new IllegalArgumentException("oldKey");
 			}
+			Submission<V, S> submission = submissionMap.get(oldKey);
 			if (submissionMap.containsKey(key)) {
 				LOGGER.info("Task exists: " + key);
 				throw new IllegalArgumentException("key");
 			}
+			LOGGER.debug("Change key from " + oldKey + " to " + key);
+			submissionMap.remove(oldKey);
 			submissionMap.put(key, submission);
 		}
 	}
@@ -133,7 +135,7 @@ public class TaskExecutor<K, V, S> {
 					
 					// Store key of submission that has done.
 					if (report instanceof ResultReport) {
-						LOGGER.debug("Remove submission: " + key);
+						LOGGER.debug("Remove done submission: " + key);
 						removeList.add(key);
 					}
 				}

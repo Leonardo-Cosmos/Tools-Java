@@ -61,6 +61,7 @@ public class FileReceiveWorker {
 	public FileReceiveWorker() {
 		server = new TransferFileServer();
 		monitor = new ReceiveFileMonitor(server);
+		monitor.execute();
 	}
 
 	public void startReceiveServer() {
