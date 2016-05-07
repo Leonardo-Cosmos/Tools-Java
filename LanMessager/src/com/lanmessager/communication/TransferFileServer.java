@@ -204,7 +204,7 @@ public class TransferFileServer extends TaskExecutor<String, FileDigestResult, F
 				String fileId = null;
 				for (int i = 0; i < readLength; i++) {
 					if (TransferFileClient.ID_END == buffer[i]) {
-						fileId = new String(buffer, 0, i - 1);
+						fileId = new String(buffer, 0, i);
 						break;
 					}
 				}

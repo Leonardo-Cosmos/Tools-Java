@@ -611,7 +611,7 @@ public class MainFrame extends JFrame {
 
 	private void startReceiveFile(File file, long fileSize, String fileId, String senderAddress) {
 		
-		fileReceiveWorker.receive(fileId);
+		fileReceiveWorker.receive(fileId, file, fileSize);
 
 		ReceiveFileMessage message = new ReceiveFileMessage();
 		message.setAccept(true);

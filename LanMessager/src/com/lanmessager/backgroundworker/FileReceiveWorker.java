@@ -24,8 +24,6 @@ import com.lanmessager.file.FileDigestResult;
 public class FileReceiveWorker {
 	private static final Logger LOGGER = Logger.getLogger(FileReceiveWorker.class.getSimpleName());
 
-	private final Map<String, ReceiveFileTask> receiveFileTaskMap;
-
 	private final TransferFileServer server;
 
 	private Future<Void> serverResult;
@@ -63,7 +61,6 @@ public class FileReceiveWorker {
 	}
 
 	public FileReceiveWorker() {
-		receiveFileTaskMap = new HashMap<>();
 		server = new TransferFileServer();
 		monitor = new ReceiveFileMonitor(server);
 	}
@@ -93,33 +90,8 @@ public class FileReceiveWorker {
 		}
 	}
 
-	public void register(String fileId, File file, long fileSize) {
-		if (receiveFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Duplicated task: " + fileId);
-			return;
-		}
-
-		ReceiveFileTask task = new ReceiveFileTask();
-		task.setFile(file);
-		task.setFileSize(fileSize);
-		receiveFileTaskMap.put(fileId, task);
-	}
-
-	public void unregister(String fileId) {
-		if (!receiveFileTaskMap.containsKey(fileId)) {
-			LOGGER.info("Cannot find task " + fileId);
-			return;
-		}
-		receiveFileTaskMap.remove(fileId);
-	}
-
-	public void receive(String fileId) {
-		if (!receiveFileTaskMap.containsKey(fileId)) {
-			LOGGER.warn("Cannot file receive file task " + fileId);
-			return;
-		}
-		ReceiveFileTask task = receiveFileTaskMap.get(fileId);
-		server.receive(fileId, task.getFile(), task.getFileSize());
+	public void receive(String fileId, File file, long fileSize) {
+		server.receive(fileId, file, fileSize);
 	}
 
 	public void cancel(String fileId) {
@@ -140,12 +112,6 @@ public class FileReceiveWorker {
 		@Override
 		protected void onDone(ResultReport<String, FileDigestResult> report) {
 			String fileId = report.getKey();
-			
-			if (!receiveFileTaskMap.containsKey(fileId)) {
-				LOGGER.warn("Cannot find send file task " + fileId);
-				return;
-			}
-			receiveFileTaskMap.remove(fileId);
 
 			if (completedListeners != null) {
 				FileCompletedEvent event = new FileCompletedEvent(this);
@@ -190,28 +156,5 @@ public class FileReceiveWorker {
 			}
 		}
 		
-	}
-
-	private class ReceiveFileTask {
-
-		private File file;
-
-		private long fileSize;
-
-		public File getFile() {
-			return file;
-		}
-
-		public void setFile(File file) {
-			this.file = file;
-		}
-
-		public long getFileSize() {
-			return fileSize;
-		}
-
-		public void setFileSize(long fileSize) {
-			this.fileSize = fileSize;
-		}
 	}
 }
