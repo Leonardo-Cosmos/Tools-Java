@@ -111,12 +111,14 @@ public class TransferFileServer extends TaskExecutor<String, FileDigestResult, F
 			serverSocket = new ServerSocket(PORT_TRANSFER_FILE);
 			LOGGER.info("Transfer file server is listening " + PORT_TRANSFER_FILE + ".");
 
-			Socket client = serverSocket.accept();			
-			String tempId = FileIdentifier.generateTemporaryIdentifierString();
-			
-			ReceiveFileTask task = new ReceiveFileTask(tempId, client);
-			// Without real ID, save thread result by temporary ID.
-			submit(tempId, task);
+			while (true) {
+				Socket client = serverSocket.accept();
+				String tempId = FileIdentifier.generateTemporaryIdentifierString();
+
+				ReceiveFileTask task = new ReceiveFileTask(tempId, client);
+				// Without real ID, save thread result by temporary ID.
+				submit(tempId, task);
+			}
 		} finally {
 			if (isRunning) {
 				stop();
