@@ -12,7 +12,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -198,60 +200,85 @@ public class TransferFileServer extends TaskExecutor<String, FileDigestResult, F
 				byte[] buffer = new byte[BUFFER_LENGTH];
 				int readLength = 0;
 				long transferedLength = 0;
-				
-				/* Read ID from head of input. */
-				readLength = input.read(buffer, 0, BUFFER_LENGTH);
 				String fileId = null;
-				for (int i = 0; i < readLength; i++) {
-					if (TransferFileClient.ID_END == buffer[i]) {
-						fileId = new String(buffer, 0, i);
-						break;
+				List<Byte> fileIdBufferList = new ArrayList<>();
+				File file = null;
+				long fileSize = 0;
+				FileDigest fileDigest = FileDigest.getInstance();
+				while ((readLength = input.read(buffer, 0, BUFFER_LENGTH)) != -1) {
+					if (fileId == null) {
+						/* Read ID from head of input. */
+						int idEndIndex = -1;
+						for (int i = 0; i < readLength; i++) {
+							if (TransferFileClient.ID_END == buffer[i]) {
+								idEndIndex = i;
+								break;
+							} else {
+								fileIdBufferList.add(buffer[i]);
+							}
+						}
+						
+						/* File ID has been totally received. */
+						if (idEndIndex != -1) {
+							/* Build file ID string. */
+							byte[] fileIdBufferArray = new byte[fileIdBufferList.size()];
+							for (int i = 0; i < fileIdBufferArray.length; i++) {
+								fileIdBufferArray[i] = fileIdBufferList.get(i);
+							}
+							fileId = new String(fileIdBufferArray);
+							
+							/* Get task according to file ID. */
+							synchronized (pendingTaskMap) {
+								if (!pendingTaskMap.containsKey(fileId)) {
+									LOGGER.warn("Pending task doesn't exist: " + fileId);
+									return null;
+								}
+								
+								ReceiveFilePendingTask pendingTask = pendingTaskMap.get(fileId);
+								file = pendingTask.getFile();
+								fileSize = pendingTask.getFileSize();
+								if (pendingTask.isCanceled()) {
+									/* Cancel self when the task has been cancelled before it is found. */
+									cancel();
+								}
+								/* 
+								 * Remove pending task and add result at synchronous block,
+								 * to ensure there is always only one of this receiving task information
+								 * can be retrieved.
+								 */
+								pendingTaskMap.remove(fileId);
+								
+								/* Change task's to real ID. */
+								changeKey(tempId, fileId);
+							}
+
+							/* Start to receive real file. */
+							output = new FileOutputStream(file);
+							
+							/* Buffer data after file ID belongs to real file. */
+							int readFileOffset = idEndIndex + 1;
+							int readFileLength = readLength - readFileOffset;
+							output.write(buffer, readFileOffset, readFileLength);
+							fileDigest.update(buffer, readFileOffset, readFileLength);
+							transferedLength += readFileLength;
+						}
+					} else {
+						/* Receive real file. */
+						output.write(buffer, 0, readLength);
+						fileDigest.update(buffer, 0, readLength);
+						transferedLength += readLength;
+						
+						LOGGER.debug("Transfer " + transferedLength + " bytes (total " + fileSize + " bytes).");
+
+						FileProgress progress = new FileProgress();
+						progress.setProcessed(transferedLength);
+						progress.setTotal(fileSize);
+						onStatusUpdated(progress);
 					}
 				}
+				
 				if (fileId == null) {
 					throw new FileUncompletedException("Cannot read file ID.");
-				}
-				
-				File file;
-				long fileSize;
-				synchronized (pendingTaskMap) {
-					if (!pendingTaskMap.containsKey(fileId)) {
-						LOGGER.warn("Pending task doesn't exist: " + fileId);
-						return null;
-					}
-					
-					ReceiveFilePendingTask pendingTask = pendingTaskMap.get(fileId);
-					file = pendingTask.getFile();
-					fileSize = pendingTask.getFileSize();
-					if (pendingTask.isCanceled()) {
-						/* Cancel self when the task has been cancelled before it is found. */
-						cancel();
-					}
-					/* 
-					 * Remove pending task and add result at synchronous block,
-					 * to ensure there is always only one of this receiving task information
-					 * can be retrieved.
-					 */
-					pendingTaskMap.remove(fileId);
-					
-					/* Change task's to real ID. */
-					changeKey(tempId, fileId);
-				}
-
-				/* Receive real file. */
-				FileDigest fileDigest = FileDigest.getInstance();
-				output = new FileOutputStream(file);
-				while ((readLength = input.read(buffer, 0, BUFFER_LENGTH)) > 0) {
-					output.write(buffer, 0, readLength);
-					fileDigest.update(buffer, 0, readLength);
-
-					transferedLength += readLength;
-					LOGGER.debug("Transfer " + transferedLength + " bytes (total " + fileSize + " bytes).");
-
-					FileProgress progress = new FileProgress();
-					progress.setProcessed(transferedLength);
-					progress.setTotal(fileSize);
-					onStatusUpdated(progress);
 				}
 
 				if (transferedLength == fileSize) {
