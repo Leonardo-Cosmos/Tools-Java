@@ -133,9 +133,11 @@ public class FileSendWorker {
 						LOGGER.info("Task is interrupted: " + fileId);
 						return;
 					} catch (ExecutionException ex) {
+						LOGGER.error("Task is failed: " + fileId, ex);
 						event.setFailed(true);
 						event.setCause(ex.getCause());
 					} catch (Exception ex) {
+						LOGGER.error("Task is failed: " + fileId, ex);
 						event.setFailed(true);
 						event.setCause(ex);
 					}
