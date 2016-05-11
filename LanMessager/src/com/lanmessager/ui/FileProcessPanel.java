@@ -55,6 +55,7 @@ public abstract class FileProcessPanel extends JPanel {
 		
 		cancelButton = new JButton(getCancelButtonText());
 		add(cancelButton);
+		cancelButton.addActionListener(e -> remove(cancelButton));
 	}
 	
 	public void updateProgress(long processed, long total) {
