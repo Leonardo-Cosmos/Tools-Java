@@ -207,7 +207,7 @@ public class TransferFileServer extends TaskExecutor<String, FileDigestResult, F
 				File file = null;
 				long fileSize = 0;
 				FileDigest fileDigest = FileDigest.getInstance();
-				while ((readLength = input.read(buffer, 0, BUFFER_LENGTH)) != -1) {
+				while (!isCancelled() && (readLength = input.read(buffer, 0, BUFFER_LENGTH)) != -1) {
 					if (fileId == null) {
 						/* Read ID from head of input. */
 						int idEndIndex = -1;

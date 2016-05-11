@@ -136,7 +136,7 @@ public class TransferFileClient extends TaskExecutor<String, FileDigestResult, F
 				long transferedLength = 0;
 				
 				/* Send real file. */
-				while ((readLength = input.read(buffer, 0, BUFFER_LENGTH)) != -1) {
+				while (!isCancelled() && (readLength = input.read(buffer, 0, BUFFER_LENGTH)) != -1) {
 					output.write(buffer, 0, readLength);
 					fileDigest.update(buffer, 0, readLength);
 					transferedLength += readLength;
