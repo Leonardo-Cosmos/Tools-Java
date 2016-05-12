@@ -118,8 +118,9 @@ public class ChatReceiveWorker {
 		protected void process(List<Packet> chunks) {
 			super.process(chunks);
 			
-			Packet packet = chunks.get(0);
-			onHandlePacket(packet);
+			for (Packet packet : chunks) {
+				onHandlePacket(packet);
+			}
 		}
 	}
 }
