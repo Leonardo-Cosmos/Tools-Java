@@ -38,13 +38,13 @@ import javax.swing.WindowConstants;
 
 import org.apache.log4j.Logger;
 
-import com.lanmessager.backgroundworker.ChatSendWorker;
 import com.lanmessager.backgroundworker.ChatReceiveWorker;
+import com.lanmessager.backgroundworker.ChatSendWorker;
 import com.lanmessager.backgroundworker.DigestFileWorker;
-import com.lanmessager.backgroundworker.NotifySendWorker;
-import com.lanmessager.backgroundworker.NotifyReceiveWorker;
-import com.lanmessager.backgroundworker.FileSendWorker;
 import com.lanmessager.backgroundworker.FileReceiveWorker;
+import com.lanmessager.backgroundworker.FileSendWorker;
+import com.lanmessager.backgroundworker.NotifyReceiveWorker;
+import com.lanmessager.backgroundworker.NotifySendWorker;
 import com.lanmessager.communication.TransferFileServer;
 import com.lanmessager.communication.host.HostInfo;
 import com.lanmessager.communication.host.HostInfoHelper;
@@ -82,9 +82,15 @@ public class MainFrame extends JFrame {
 	private static final String FILE_MENU_TEXT = "File";
 	private static final String SEND_FILE_MENU_ITEM_TEXT = "Send file to friend...";
 	private static final String DIGEST_FILE_MENU_ITEM_TEXT = "Digest file...";
+	
+	private static final String FRIEND_MENU_TEXT = "Friend";
+	private static final String REFRESH_FRIEND_LIST_MENU_ITEM_TEXT = "Refresh friend list";
+	private static final String ADD_FRIEND_MENU_ITEM_TEXT = "Add friend...";
+	private static final String REMOVE_FRIEND_MENU_ITEM_TEXT = "Remove friend";
+	
 	private static final String SEND_FILE_POPUP_MENU_ITEM_TEXT = "Send file...";
-
-
+	private static final String REMOVE_FRIEND_POPUP_MENU_ITEM_TEXT = "Remove friend";
+	
 	private final JFileChooser openFileChooser = new JFileChooser();
 	private final JFileChooser saveFileChooser = new JFileChooser();
 
@@ -279,6 +285,29 @@ public class MainFrame extends JFrame {
 		fileMenu.add(digestMenuItem);
 
 		menuBar.add(fileMenu);
+		
+		JMenu friendMenu = new JMenu(FRIEND_MENU_TEXT);
+		
+		JMenuItem refreshFriendListMenuItem = new JMenuItem(REFRESH_FRIEND_LIST_MENU_ITEM_TEXT);
+		refreshFriendListMenuItem.addActionListener(e -> {
+			refreshFriendList();
+		});
+		friendMenu.add(refreshFriendListMenuItem);
+		
+		JMenuItem addFriendMenuItem = new JMenuItem(ADD_FRIEND_MENU_ITEM_TEXT);
+		addFriendMenuItem.addActionListener(e -> {
+			addFriendFromDialog();
+		});
+		friendMenu.add(addFriendMenuItem);
+		
+		JMenuItem removeFriendMenuItem = new JMenuItem(REMOVE_FRIEND_MENU_ITEM_TEXT);
+		removeFriendMenuItem.addActionListener(e -> {
+			removeSelectedFriend();
+		});
+		friendMenu.add(removeFriendMenuItem);
+		
+		menuBar.add(friendMenu);
+		
 		add(menuBar, BorderLayout.NORTH);
 
 		popupMenu = new JPopupMenu();
@@ -288,6 +317,12 @@ public class MainFrame extends JFrame {
 			sendFileToSelectedFriend();
 		});
 		popupMenu.add(sendPopupMenuItem);
+		
+		JMenuItem removeFriendPopupMenuItem = new JMenuItem(REMOVE_FRIEND_POPUP_MENU_ITEM_TEXT);
+		removeFriendPopupMenuItem.addActionListener(e -> {
+			removeSelectedFriend();
+		});
+		popupMenu.add(removeFriendPopupMenuItem);
 
 		splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
 
@@ -336,11 +371,7 @@ public class MainFrame extends JFrame {
 		/* Start notify server. */
 		notifyReceiver.start();
 
-		/* Send broadcast to notify that this host is online. */
-		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
-		onlineMessage.setName(localHostInfo.getName());
-		onlineMessage.setAddress(localHostInfo.getAddress());
-		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, onlineMessage);
+		refreshFriendList();
 
 		/* Setup chat server. */
 		chatReceiver.addSendFileListener(event -> {
@@ -459,7 +490,44 @@ public class MainFrame extends JFrame {
 		
 		digestWorker.shutdown();
 	}
+	
+	/**
+	 *  Send broadcast to notify that this host is online.
+	 */
+	private void refreshFriendList() {
+		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
+		onlineMessage.setName(localHostInfo.getName());
+		onlineMessage.setAddress(localHostInfo.getAddress());
+		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, onlineMessage);
+	}
 
+	/**
+	 * Manually add friend via input text dialog.
+	 */
+	private void addFriendFromDialog() {
+		String name = JOptionPane.showInputDialog(this, "Name", "Add friend", JOptionPane.QUESTION_MESSAGE);
+		if (name == null) {
+			// User click cancel button.
+			return;
+		}
+		if (name.trim().isEmpty()) {
+			JOptionPane.showMessageDialog(this, "Please input a name for this friend", "Add friend", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		
+		String address = JOptionPane.showInputDialog(this, "IP address", "Add friend", JOptionPane.QUESTION_MESSAGE);
+		if (address == null) {
+			// User click cancel button.
+			return;
+		}
+		if (address.isEmpty()) {
+			JOptionPane.showMessageDialog(this, "Please input IP address", "Add friend", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		
+		addFriend(name, HostInfoHelper.getInetAddress(address));
+	}
+	
 	private void addFriend(String name, String address) {
 		if (name == null || address == null) {
 			LOGGER.info("Ignore empty message.");
@@ -490,6 +558,16 @@ public class MainFrame extends JFrame {
 		notifySender.send(address, onlineMessage);
 	}
 
+	/**
+	 * Remove selected friend from list.
+	 */
+	private void removeSelectedFriend() {
+		FriendInfo friendInfo = getSelectedFriend();
+		if (friendInfo != null) {
+			removeFriend(friendInfo.getName(), friendInfo.getAddress());
+		}
+	}
+	
 	private void removeFriend(String name, String address) {
 		for (int i = 0; i < friendListModel.size(); i++) {
 			FriendInfo friendInfo = friendListModel.getElementAt(i);
@@ -523,11 +601,19 @@ public class MainFrame extends JFrame {
 		}
 	}
 
-	private void sendFileToSelectedFriend() {
+	private FriendInfo getSelectedFriend() {
+		FriendInfo friendInfo = null;
 		int selectedIndex = friendList.getSelectedIndex();
 		if (selectedIndex != -1) {
-			FriendInfo friend = friendListModel.get(selectedIndex);
-			String receiverAddress = friend.getAddress();
+			friendInfo = friendListModel.get(selectedIndex);
+		}
+		return friendInfo;
+	}
+	
+	private void sendFileToSelectedFriend() {
+		FriendInfo friendInfo = getSelectedFriend();
+		if (friendInfo != null) {
+			String receiverAddress = friendInfo.getAddress();
 			prepareSendFile(receiverAddress);
 		}
 	}

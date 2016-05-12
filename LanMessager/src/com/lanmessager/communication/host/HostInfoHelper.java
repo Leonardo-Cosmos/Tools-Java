@@ -49,4 +49,14 @@ public final class HostInfoHelper {
 		String[] addresses = new String[addressList.size()];
 		return addressList.toArray(addresses);
 	}
+	
+	public static String getInetAddress(String host) {
+		String hostAddress = null;
+		try {
+			hostAddress = InetAddress.getByName(host).getHostAddress();
+		} catch (UnknownHostException ex) {
+			LOGGER.warn("IP address for the host (" + host + ") could be found.", ex);			
+		}
+		return hostAddress;
+	}
 }
