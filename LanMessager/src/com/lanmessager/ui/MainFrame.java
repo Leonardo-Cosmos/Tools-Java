@@ -530,19 +530,26 @@ public class MainFrame extends JFrame {
 	
 	private void addFriend(String name, String address) {
 		if (name == null || address == null) {
-			LOGGER.info("Ignore empty message.");
+			LOGGER.info("Ignore empty friend information.");
 			return;
 		}
-		if (localHostInfo.getName().equals(name) || localHostInfo.getAddress().equals(address)) {
-			LOGGER.info("Ignore broadcast from self.");
+		if (localHostInfo.getAddress().equals(address)) {
+			LOGGER.info("Ignore broadcast from self. (" + address + ")");
 			return;
 		}
 				
 		for (int i = 0; i < friendListModel.size(); i++) {
 			FriendInfo friendInfo = friendListModel.getElementAt(i);
-			if (friendInfo.getName().equals(name) && friendInfo.getAddress().equals(address)) {
-				LOGGER.info("Ignore added friend.");
-				return;
+			if (friendInfo.getAddress().equals(address)) {
+				if (friendInfo.getName().equals(name)) {
+					LOGGER.info("Ignore added friend. (" + address + ")");
+					return;
+				} else {
+					friendInfo.setName(name);
+					
+					LOGGER.info("Rename added friend. (" + address + ")");
+					return;
+				}
 			}
 		}
 
@@ -571,8 +578,7 @@ public class MainFrame extends JFrame {
 	private void removeFriend(String name, String address) {
 		for (int i = 0; i < friendListModel.size(); i++) {
 			FriendInfo friendInfo = friendListModel.getElementAt(i);
-			if (friendInfo.getName().equals(name) && friendInfo.getAddress().equals(address)) {
-
+			if (friendInfo.getAddress().equals(address)) {
 				friendListModel.removeElementAt(i);
 				break;
 			}
