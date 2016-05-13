@@ -50,12 +50,8 @@ public abstract class FileProcessPanel extends JPanel {
 		statusLabel = new JLabel(String.format(getStatusLabelTextInitialize(), fileName));
 		add(statusLabel);
 		
-		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);	
-		add(progressBar);
-		
+		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);
 		cancelButton = new JButton(getCancelButtonText());
-		add(cancelButton);
-		cancelButton.addActionListener(e -> remove(cancelButton));
 	}
 	
 	public void updateProgress(long processed, long total) {
@@ -64,34 +60,50 @@ public abstract class FileProcessPanel extends JPanel {
 	}
 	
 	public void complete(FileDigestResult result) {
+		statusLabel.setText(String.format(getStatusLabelTextSucceed(), fileName));
+		
 		progressBar.setValue(PROGRESS_BAR_MAX);
 		
-		statusLabel.setText(String.format(getStatusLabelTextSucceed(), fileName));
+		remove(cancelButton);
 		
 		add(new JLabel(String.format(MD5_LABEL_TEXT, result.getMd5HexString())));
 		add(new JLabel(String.format(SHA1_LABEL_TEXT, result.getSha1HexString())));
 		add(new JLabel(String.format(SHA256_LABEL_TEXT, result.getSha256HexString())));
+		
 		validate();
 	}
 	
 	public void fail(String cause) {
 		statusLabel.setText(String.format(getStatusLabelTextFail(), fileName));
 		
+		remove(cancelButton);
+		
 		add(new JLabel(cause));
+		
 		validate();
 	}
 	
 	public void abort() {
 		statusLabel.setText(String.format(getStatusLabelTextAbort(), fileName));
+		
+		validate();
 	}
 	
 	public void start() {
 		statusLabel.setText(String.format(getStatusLabelTextStart(), fileName));
+		
+		add(progressBar);		
+		add(cancelButton);
+		
+		validate();
 	}
 	
 	public void cancel() {
 		statusLabel.setText(String.format(getStatusLabelTextCancel(), fileName));
+		
 		remove(cancelButton);
+		
+		validate();
 	}
 	
 	public void addCancelButtonActionListener(ActionListener l) {

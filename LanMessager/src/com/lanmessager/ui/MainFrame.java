@@ -19,11 +19,8 @@ import java.util.Properties;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -643,8 +640,6 @@ public class MainFrame extends JFrame {
 			message.setFileId(fileId);
 			message.setSenderAddress(localHostInfo.getAddress());
 			chatSender.send(receiverAddress, message);
-			
-			//addChatLabel("Send: " + file.getName());
 		}
 	}
 
@@ -652,6 +647,12 @@ public class MainFrame extends JFrame {
 	 * Start sending file when remote host accept.
 	 */
 	private void startSendFile(String fileId) {
+		if (!sendFilePanelMap.containsKey(fileId)) {
+			LOGGER.warn("Cannot find send file panel: " + fileId);
+			return;
+		}
+		SendFilePanel panel = sendFilePanelMap.get(fileId);
+		panel.start();
 		fileSendWorker.send(fileId);
 	}
 
@@ -672,8 +673,11 @@ public class MainFrame extends JFrame {
 	}
 
 	private void prepareReceiveFile(String fileName, long fileSize, String fileId, String senderAddress) {
-		JButton acceptButton = new JButton("Accept");
-		acceptButton.addActionListener(e -> {
+		ReceiveFilePanel panel = new ReceiveFilePanel(fileName);
+		addPanel(panel);
+		receiveFilePanelMap.put(fileId, panel);
+		panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));		
+		panel.addAcceptButtonActionListener(e -> {
 			File savedFile = saveFileChooser.getSelectedFile();
 			if (savedFile != null) {
 				saveFileChooser.setSelectedFile(new File(savedFile.getParent(), fileName));
@@ -685,24 +689,23 @@ public class MainFrame extends JFrame {
 				File file = saveFileChooser.getSelectedFile();
 				startReceiveFile(file, fileSize, fileId, senderAddress);
 
-				ReceiveFilePanel panel = new ReceiveFilePanel(file.getName());
-				addPanel(panel);
-				receiveFilePanelMap.put(fileId, panel);
-				panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));
+				
 			} else if (JFileChooser.APPROVE_OPTION == saveFileOption) {
 				abortReceiveFile(fileId, senderAddress);
 			}
-		});
-		JButton abortButton = new JButton("Abort");
-		abortButton.addActionListener(e -> {
-			abortReceiveFile(fileId, senderAddress);
 		});		
-
-		addChatLabelWithComponents("Receive: " + fileName, acceptButton, abortButton);
+		panel.addAbortButtonActionListener(e -> {
+			abortReceiveFile(fileId, senderAddress);
+		});
 	}
 
 	private void startReceiveFile(File file, long fileSize, String fileId, String senderAddress) {
-		
+		if (!receiveFilePanelMap.containsKey(fileId)) {
+			LOGGER.warn("Cannot find receive file panel: " + fileId);
+			return;
+		}
+		ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
+		panel.start();
 		fileReceiveWorker.receive(fileId, file, fileSize);
 
 		ReceiveFileMessage message = new ReceiveFileMessage();
@@ -737,21 +740,6 @@ public class MainFrame extends JFrame {
 	private void addPanel(JPanel panel) {
 		chatPanel.add(Box.createVerticalStrut(10));
 		chatPanel.add(panel);
-		chatPanel.validate();
-	}
-	
-	/*private void addChatLabel(String text) {
-		JLabel label = new JLabel(text);
-		chatPanel.add(label);
-		chatPanel.validate();
-	}*/
-
-	private void addChatLabelWithComponents(String text, JComponent... components) {
-		JLabel label = new JLabel(text);
-		chatPanel.add(label);
-		for (JComponent component : components) {
-			chatPanel.add(component);
-		}
 		chatPanel.validate();
 	}
 }
