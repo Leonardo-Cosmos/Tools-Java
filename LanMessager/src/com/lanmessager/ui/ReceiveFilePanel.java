@@ -1,5 +1,7 @@
 package com.lanmessager.ui;
 
+import javax.swing.JLabel;
+
 public class ReceiveFilePanel extends AcceptFileProcessPanel {
 
 	/**
@@ -13,9 +15,13 @@ public class ReceiveFilePanel extends AcceptFileProcessPanel {
 	private static final String STATUS_LABEL_TEXT_SUCCEED = "Received file successfully: %s";
 	private static final String STATUS_LABEL_TEXT_FAIL = "Receive file failed: %s";
 	private static final String STATUS_LABEL_TEXT_CANCEL = "Receiving file canceled: %s";
-		
-	public ReceiveFilePanel(String fileName) {
+	
+	private static final String SEND_LABEL_TEXT = "From %s";
+	
+	public ReceiveFilePanel(String fileName, String sender) {
 		super(fileName);
+		
+		add(new JLabel(String.format(SEND_LABEL_TEXT, sender)), 0);
 	}
 
 	@Override

@@ -629,7 +629,7 @@ public class MainFrame extends JFrame {
 
 			fileSendWorker.register(receiverAddress, fileId, file, file.length());
 
-			SendFilePanel panel = new SendFilePanel(file.getName());
+			SendFilePanel panel = new SendFilePanel(file.getName(), getFriendName(receiverAddress));
 			addPanel(panel);
 			sendFilePanelMap.put(fileId, panel);
 			panel.addCancelButtonActionListener(event -> cancelSendFile(fileId));
@@ -673,7 +673,7 @@ public class MainFrame extends JFrame {
 	}
 
 	private void prepareReceiveFile(String fileName, long fileSize, String fileId, String senderAddress) {
-		ReceiveFilePanel panel = new ReceiveFilePanel(fileName);
+		ReceiveFilePanel panel = new ReceiveFilePanel(fileName, getFriendName(senderAddress));
 		addPanel(panel);
 		receiveFilePanelMap.put(fileId, panel);
 		panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));		
@@ -735,6 +735,21 @@ public class MainFrame extends JFrame {
 
 	private void cancelReceiveFile(String fileId) {
 		fileReceiveWorker.cancel(fileId);
+	}
+	
+	/**
+	 * Retrieve friend name by specified friend address.
+	 * @param address
+	 * @return Name of friend if he/she is in list, otherwise the address.
+	 */
+	private String getFriendName(String address) {
+		for (int i = 0; i < friendListModel.size(); i++) {
+			FriendInfo friendInfo = friendListModel.getElementAt(i);
+			if (friendInfo.getAddress().equals(address)) {
+				return friendInfo.getName();
+			}
+		}
+		return address;
 	}
 
 	private void addPanel(JPanel panel) {

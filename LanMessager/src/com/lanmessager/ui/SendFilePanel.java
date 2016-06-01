@@ -1,5 +1,7 @@
 package com.lanmessager.ui;
 
+import javax.swing.JLabel;
+
 public class SendFilePanel extends FileProcessPanel {
 
 	/**
@@ -14,8 +16,12 @@ public class SendFilePanel extends FileProcessPanel {
 	private static final String STATUS_LABEL_TEXT_FAIL = "Send file failed: %s";
 	private static final String STATUS_LABEL_TEXT_CANCEL = "Sending file is canceled: %s";
 	
-	public SendFilePanel(String fileName) {
+	private static final String RECEIVER_LABEL_TEXT = "To %s";
+	
+	public SendFilePanel(String fileName, String receiver) {
 		super(fileName);
+		
+		add(new JLabel(String.format(RECEIVER_LABEL_TEXT, receiver)), 0);
 	}
 
 	@Override
