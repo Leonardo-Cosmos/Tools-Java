@@ -65,6 +65,7 @@ public class MainFrame extends JFrame {
 	private static final String REFRESH_FRIEND_LIST_MENU_ITEM_TEXT = "Refresh friend list";
 	private static final String ADD_FRIEND_MENU_ITEM_TEXT = "Add friend...";
 	private static final String REMOVE_FRIEND_MENU_ITEM_TEXT = "Remove friend";
+	private static final String CHANGE_USER_NAME_MENU_ITEM_TEXT = "Change user name...";
 	
 	private static final String SEND_FILE_POPUP_MENU_ITEM_TEXT = "Send file...";
 	private static final String REMOVE_FRIEND_POPUP_MENU_ITEM_TEXT = "Remove friend";
@@ -83,6 +84,7 @@ public class MainFrame extends JFrame {
 	private Map<String, ReceiveFilePanel> receiveFilePanelMap = new HashMap<>();
 
 	private static HostInfo localHostInfo;
+	private String userName;
 
 	private final NotifySendWorker notifySender = new NotifySendWorker();
 	private final NotifyReceiveWorker notifyReceiver = new NotifyReceiveWorker();
@@ -102,8 +104,6 @@ public class MainFrame extends JFrame {
 
 			@Override
 			public void windowOpened(WindowEvent e) {
-				initWorker();
-				
 				UserConfig userConfig = UserConfig.instance;
 				try {
 					userConfig.load();
@@ -126,6 +126,13 @@ public class MainFrame extends JFrame {
 				if (null != selectedSaveFilePath) {
 					saveFileChooser.setSelectedFile(new File(selectedSaveFilePath));
 				}
+				
+				userName = userConfig.getUserName();
+				if (null == userName) {
+					userName = localHostInfo.getName();
+				}
+
+				initWorker();
 			}
 			
 			@Override
@@ -154,6 +161,8 @@ public class MainFrame extends JFrame {
 				if (null != selectedSaveFile) {
 					userConfig.setSaveFilePath(selectedSaveFile.getAbsolutePath());
 				}
+				
+				userConfig.setUserName(userName);
 				
 				try {
 					userConfig.save();
@@ -245,6 +254,12 @@ public class MainFrame extends JFrame {
 			removeSelectedFriend();
 		});
 		friendMenu.add(removeFriendMenuItem);
+		
+		JMenuItem changeUserNameMenuItem = new JMenuItem(CHANGE_USER_NAME_MENU_ITEM_TEXT);
+		changeUserNameMenuItem.addActionListener(e -> {
+			changeUserName();
+		});
+		friendMenu.add(changeUserNameMenuItem);
 		
 		menuBar.add(friendMenu);
 		
@@ -417,7 +432,7 @@ public class MainFrame extends JFrame {
 
 		/* Send broadcast to notify that this host is offline. */
 		FriendOfflineMessage offlineMessage = new FriendOfflineMessage();
-		offlineMessage.setName(localHostInfo.getName());
+		offlineMessage.setName(userName);
 		offlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, offlineMessage);
 
@@ -436,7 +451,7 @@ public class MainFrame extends JFrame {
 	 */
 	private void refreshFriendList() {
 		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
-		onlineMessage.setName(localHostInfo.getName());
+		onlineMessage.setName(userName);
 		onlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, onlineMessage);
 	}
@@ -500,7 +515,7 @@ public class MainFrame extends JFrame {
 
 		/* Reply local host to remote friend. */
 		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
-		onlineMessage.setName(localHostInfo.getName());
+		onlineMessage.setName(userName);
 		onlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(address, onlineMessage);
 	}
@@ -678,6 +693,21 @@ public class MainFrame extends JFrame {
 
 	private void cancelReceiveFile(String fileId) {
 		fileReceiveWorker.cancel(fileId);
+	}
+	
+	private void changeUserName() {
+		String name = (String) JOptionPane.showInputDialog(this, "Name", "Change user name",
+				JOptionPane.QUESTION_MESSAGE, null, null, userName);
+		if (name == null) {
+			// User click cancel button.
+			return;
+		}
+		if (name.trim().isEmpty()) {
+			JOptionPane.showMessageDialog(this, "Please input a name", "Change user name", JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+
+		userName = name;
 	}
 	
 	/**

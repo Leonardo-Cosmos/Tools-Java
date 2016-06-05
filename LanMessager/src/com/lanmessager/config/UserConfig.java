@@ -19,8 +19,11 @@ public class UserConfig {
 	private static final String PROP_WINDOW_LOCATION_X = "WindowLocationX";
 	private static final String PROP_WINDOW_LOCATION_Y = "WindowLocationY";
 	private static final String PROP_SPLIT_PANE_DIVIDER_LOCATION = "SplitPaneDividerLocation";
+	
 	private static final String PROP_OPEN_FILE_PATH = "OpenFilePath";
 	private static final String PROP_SAVE_FILE_PATH = "SaveFilePath";
+	
+	private static final String PROP_USER_NAME = "UserName";
 	
 	private static final String DEFAULT_SIZE_WIDTH = "800";
 	private static final String DEFAULT_SIZE_HEIGHT = "600";
@@ -35,8 +38,11 @@ public class UserConfig {
 	private int windowLocationX;
 	private int windowLocationY;
 	private int splitPaneDividerLocation;
+	
 	private String openFilePath;
 	private String saveFilePath;
+	
+	private String userName;
 	
 	private UserConfig() {
 		
@@ -56,6 +62,8 @@ public class UserConfig {
 		
 		properties.setProperty(PROP_OPEN_FILE_PATH, openFilePath);
 		properties.setProperty(PROP_SAVE_FILE_PATH, saveFilePath);
+		
+		properties.setProperty(PROP_USER_NAME, userName);
 		
 		/* Saves properties to file. */
 		File propFile = new File(PROP_FILE_PATH);
@@ -117,6 +125,8 @@ public class UserConfig {
 		
 		openFilePath = properties.getProperty(PROP_OPEN_FILE_PATH);
 		saveFilePath = properties.getProperty(PROP_SAVE_FILE_PATH);
+		
+		userName = properties.getProperty(PROP_USER_NAME);
 	}
 
 	public int getWindowSizeWidth() {
@@ -173,5 +183,13 @@ public class UserConfig {
 
 	public void setSaveFilePath(String saveFilePath) {
 		this.saveFilePath = saveFilePath;
+	}
+
+	public String getUserName() {
+		return userName;
+	}
+
+	public void setUserName(String userName) {
+		this.userName = userName;
 	}
 }
