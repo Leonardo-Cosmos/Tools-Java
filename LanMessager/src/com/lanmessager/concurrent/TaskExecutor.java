@@ -1,12 +1,25 @@
 package com.lanmessager.concurrent;
 
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.lang.ref.WeakReference;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.log4j.Logger;
+
+import sun.awt.AppContext;
 
 /**
  * An TaskExecutor is an wrap of {@link ExecutorService} that accept {@link Task} only.
@@ -21,19 +34,75 @@ import org.apache.log4j.Logger;
 public class TaskExecutor<K, V, S> {
 	private static final Logger LOGGER = Logger.getLogger(TaskExecutor.class.getSimpleName());
 	
+	private static final int DEFAULT_THREAD_NUMBER = 3;
+	
 	private final ExecutorService executorService;
 	
 	private final Map<K, Submission<V, S>> submissionMap;
 	
 	private Monitor<K, V, S> monitor;
 	
+	private static ExecutorService getWorkersExecutorService(Class<? extends TaskExecutor<?, ?, ?>> clazz,
+			int threadNumber) {
+		LOGGER.debug("Class name: " + clazz.getSimpleName());
+		
+		final AppContext appContext = AppContext.getAppContext();
+		ExecutorService executorService = (ExecutorService) appContext.get(clazz);
+		if (executorService == null) {
+			ThreadFactory threadFactory = new ThreadFactory() {
+				final ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+				@Override
+				public Thread newThread(Runnable r) {
+					Thread thread = defaultFactory.newThread(r);
+					thread.setName(clazz.getSimpleName() + "-" + thread.getName());
+					thread.setDaemon(true);
+					return thread;
+				}
+			};
+			executorService = new ThreadPoolExecutor(threadNumber, threadNumber, 1L, TimeUnit.MINUTES,
+					new LinkedBlockingQueue<>(), threadFactory);
+			appContext.put(clazz, executorService);
+		}
+		
+		final ExecutorService es = executorService;
+		appContext.addPropertyChangeListener(AppContext.DISPOSED_PROPERTY_NAME,
+				new PropertyChangeListener() {
+					
+					@Override
+					public void propertyChange(PropertyChangeEvent evt) {
+						boolean disposed = (Boolean) evt.getNewValue();
+						if (disposed) {
+							final WeakReference<ExecutorService> executorServiceRef = new WeakReference<ExecutorService>(es);
+							final ExecutorService executorService = executorServiceRef.get();
+							if (executorService != null) {
+								AccessController.doPrivileged(new PrivilegedAction<Void>() {
+									public Void run() {
+										executorService.shutdown();
+										return null;
+									};
+								});
+							}
+						}
+					}
+				});
+
+		return executorService;
+	}
+	
 	void setMonitor(Monitor<K, V, S> monitor) {
 		this.monitor = monitor;
 	}
 
-	public TaskExecutor(ExecutorService executor) {
-		this.executorService = executor;
+	@SuppressWarnings("unchecked")
+	public TaskExecutor(int threadNumber) {
+		this.executorService = getWorkersExecutorService(
+				(Class<? extends TaskExecutor<?, ?, ?>>) this.getClass(),
+				threadNumber);
 		this.submissionMap = new HashMap<>();
+	}
+	
+	public TaskExecutor() {
+		this(DEFAULT_THREAD_NUMBER);
 	}
 	
 	public void submit(K key, Task<V, S> task) {
