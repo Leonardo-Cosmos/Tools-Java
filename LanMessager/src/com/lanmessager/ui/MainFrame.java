@@ -551,6 +551,7 @@ public class MainFrame extends JFrame {
 			panel.addCancelButtonActionListener(event -> {
 				digestWorker.cancel(fileId);
 			});
+			panel.start();
 			
 			DigestFileTask task = new DigestFileTask();
 			task.setFile(file);
