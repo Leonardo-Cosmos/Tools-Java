@@ -1,7 +1,5 @@
 package com.lanmessager.concurrent;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.lang.ref.WeakReference;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -19,8 +17,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import sun.awt.AppContext;
-
 /**
  * An TaskExecutor is an wrap of {@link ExecutorService} that accept {@link Task} only.
  * All {@link Task} can be retrieved by a key.
@@ -36,16 +32,16 @@ public class TaskExecutor<K, V, S> {
 	
 	private static final int DEFAULT_THREAD_NUMBER = 3;
 	
+	private static  Map<Class<? extends TaskExecutor<?, ?, ?>>, ExecutorService> executorServiceMap = new HashMap<>();
+	
 	private final ExecutorService executorService;
 	
 	private final Map<K, Submission<V, S>> submissionMap;
 	
 	private Monitor<K, V, S> monitor;
 	
-	private static ExecutorService getWorkersExecutorService(Class<? extends TaskExecutor<?, ?, ?>> clazz,
-			int threadNumber) {
-		LOGGER.debug("Class name: " + clazz.getSimpleName());
-		
+	/*private static ExecutorService getWorkersExecutorService(Class<? extends TaskExecutor<?, ?, ?>> clazz,
+			int threadNumber) {		
 		final AppContext appContext = AppContext.getAppContext();
 		ExecutorService executorService = (ExecutorService) appContext.get(clazz);
 		if (executorService == null) {
@@ -85,6 +81,44 @@ public class TaskExecutor<K, V, S> {
 						}
 					}
 				});
+
+		return executorService;
+	}*/
+	
+	private static ExecutorService getWorkersExecutorService(Class<? extends TaskExecutor<?, ?, ?>> clazz,
+			int threadNumber) {
+		ExecutorService executorService = (ExecutorService) executorServiceMap.get(clazz);
+		if (executorService == null) {
+			ThreadFactory threadFactory = new ThreadFactory() {
+				final ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+
+				@Override
+				public Thread newThread(Runnable r) {
+					Thread thread = defaultFactory.newThread(r);
+					thread.setName(clazz.getSimpleName() + "-" + thread.getName());
+					thread.setDaemon(true);
+					return thread;
+				}
+			};
+			executorService = new ThreadPoolExecutor(threadNumber, threadNumber, 1L, TimeUnit.MINUTES,
+					new LinkedBlockingQueue<>(), threadFactory);
+			executorServiceMap.put(clazz, executorService);
+
+			final WeakReference<ExecutorService> executorServiceRef = new WeakReference<ExecutorService>(
+					executorService);
+			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+				final ExecutorService executorServiceObj = executorServiceRef.get();
+				if (executorServiceObj != null) {
+					AccessController.doPrivileged(new PrivilegedAction<Void>() {
+						public Void run() {
+							executorServiceObj.shutdown();
+							return null;
+						};
+					});
+
+				}
+			}));
+		}
 
 		return executorService;
 	}
