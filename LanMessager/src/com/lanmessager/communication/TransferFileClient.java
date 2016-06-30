@@ -80,7 +80,7 @@ public class TransferFileClient extends TaskExecutor<String, FileDigestResult, F
 					fileDigest.update(buffer, 0, readLength);
 					transferedLength += readLength;
 					
-					LOGGER.debug("Transfer " + transferedLength + " bytes (total " + fileSize + " bytes).");
+					//LOGGER.debug("Transfer " + transferedLength + " bytes (total " + fileSize + " bytes).");
 
 					FileProgress progress = new FileProgress();
 					progress.setProcessed(transferedLength);
