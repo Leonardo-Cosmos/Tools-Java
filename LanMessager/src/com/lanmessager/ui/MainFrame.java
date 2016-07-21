@@ -57,6 +57,8 @@ public class MainFrame extends JFrame {
 
 	private static final Logger LOGGER = Logger.getLogger(MainFrame.class.getSimpleName());
 	
+	private static final String FRAME_TITLE = "LAN Messenger - (%s)";
+	
 	private static final String FILE_MENU_TEXT = "File";
 	private static final String SEND_FILE_MENU_ITEM_TEXT = "Send file to friend...";
 	private static final String DIGEST_FILE_MENU_ITEM_TEXT = "Digest file...";
@@ -127,10 +129,11 @@ public class MainFrame extends JFrame {
 					saveFileChooser.setSelectedFile(new File(selectedSaveFilePath));
 				}
 				
-				userName = userConfig.getUserName();
+				String userName = userConfig.getUserName();
 				if (null == userName) {
 					userName = localHostInfo.getName();
 				}
+				setUserName(userName);
 
 				initWorker();
 			}
@@ -162,7 +165,7 @@ public class MainFrame extends JFrame {
 					userConfig.setSaveFilePath(selectedSaveFile.getAbsolutePath());
 				}
 				
-				userConfig.setUserName(userName);
+				userConfig.setUserName(getUserName());
 				
 				try {
 					userConfig.save();
@@ -176,6 +179,15 @@ public class MainFrame extends JFrame {
 				System.exit(0);
 			}
 		});
+	}
+
+	private String getUserName() {
+		return userName;
+	}
+
+	private void setUserName(String userName) {
+		this.userName = userName;
+		this.setTitle(String.format(FRAME_TITLE, this.userName));
 	}
 
 	private void getLocalHostInfo() {
@@ -432,7 +444,7 @@ public class MainFrame extends JFrame {
 
 		/* Send broadcast to notify that this host is offline. */
 		FriendOfflineMessage offlineMessage = new FriendOfflineMessage();
-		offlineMessage.setName(userName);
+		offlineMessage.setName(getUserName());
 		offlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, offlineMessage);
 
@@ -451,7 +463,7 @@ public class MainFrame extends JFrame {
 	 */
 	private void refreshFriendList() {
 		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
-		onlineMessage.setName(userName);
+		onlineMessage.setName(getUserName());
 		onlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(HostInfoHelper.BROADCAST_ADRESS, onlineMessage);
 	}
@@ -515,7 +527,7 @@ public class MainFrame extends JFrame {
 
 		/* Reply local host to remote friend. */
 		FriendOnlineMessage onlineMessage = new FriendOnlineMessage();
-		onlineMessage.setName(userName);
+		onlineMessage.setName(getUserName());
 		onlineMessage.setAddress(localHostInfo.getAddress());
 		notifySender.send(address, onlineMessage);
 	}
@@ -698,7 +710,7 @@ public class MainFrame extends JFrame {
 	
 	private void changeUserName() {
 		String name = (String) JOptionPane.showInputDialog(this, "Name", "Change user name",
-				JOptionPane.QUESTION_MESSAGE, null, null, userName);
+				JOptionPane.QUESTION_MESSAGE, null, null, getUserName());
 		if (name == null) {
 			// User click cancel button.
 			return;
@@ -708,7 +720,7 @@ public class MainFrame extends JFrame {
 			return;
 		}
 
-		userName = name;
+		setUserName(name);
 	}
 	
 	/**
