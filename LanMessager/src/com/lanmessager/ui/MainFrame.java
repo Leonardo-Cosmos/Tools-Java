@@ -158,11 +158,15 @@ public class MainFrame extends JFrame {
 				File selectedOpenFile = openFileChooser.getSelectedFile();
 				if (null != selectedOpenFile) {
 					userConfig.setOpenFilePath(selectedOpenFile.getAbsolutePath());
+				} else {
+					userConfig.setOpenFilePath("");
 				}
 				
 				File selectedSaveFile = saveFileChooser.getSelectedFile();
 				if (null != selectedSaveFile) {
 					userConfig.setSaveFilePath(selectedSaveFile.getAbsolutePath());
+				} else {
+					userConfig.setSaveFilePath("");
 				}
 				
 				userConfig.setUserName(getUserName());
