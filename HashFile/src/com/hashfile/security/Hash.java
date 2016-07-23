@@ -5,7 +5,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.zip.CRC32;
 
 /**
- * A class that can be used to compute the MD5, SHA1, CRC-32 of a data stream.
+ * A class that can be used to compute the MD5, SHA1, SHA-512, CRC-32 of a data stream.
  * @author Leonardo
  *
  */
@@ -19,6 +19,10 @@ public class Hash {
 	
 	private byte[] sha1Value;
 	
+	private MessageDigest sha512;
+	
+	private byte[] sha512Value;
+	
 	private CRC32 crc32;
 	
 	private long crc32Value;
@@ -29,7 +33,18 @@ public class Hash {
 	public Hash() {
 		try {
 			md5 = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		
+		try {
 			sha1 = MessageDigest.getInstance("SHA1");
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		
+		try {
+			sha512 = MessageDigest.getInstance("SHA-512");
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
@@ -38,6 +53,7 @@ public class Hash {
 		
 		md5Value = null;
 		sha1Value = null;
+		sha512Value = null;
 		crc32Value = 0;
 	}
 	
@@ -47,6 +63,7 @@ public class Hash {
 	public void reset() {
 		md5.reset();
 		sha1.reset();
+		sha512.reset();
 		crc32.reset();
 	}
 	
@@ -63,6 +80,11 @@ public class Hash {
 		sha1.update(input);
 		if (sha1Value != null) {
 			sha1Value = null;
+		}
+		
+		sha512.update(input);
+		if (sha512Value != null) {
+			sha512Value = null;
 		}
 		
 		crc32.update(input);
@@ -88,6 +110,11 @@ public class Hash {
 			sha1Value = null;
 		}
 		
+		sha512.update(input, offset, length);
+		if (sha512Value != null) {
+			sha512Value = null;
+		}
+		
 		crc32.update(input, offset, length);
 		if (crc32Value != 0) {
 			crc32Value = 0;
@@ -110,12 +137,7 @@ public class Hash {
 	 * @return MD5 value.
 	 */
 	public String getMD5Text() {
-		byte[] md5Bytes = getMD5Value();
-		StringBuffer strBuffer = new StringBuffer();
-		for (byte aByte : md5Bytes) {
-			strBuffer.append(String.format("%1$02x", aByte));
-		}
-		return strBuffer.toString();
+		return getHexText(getMD5Value());
 	}
 	
 	/**
@@ -134,12 +156,26 @@ public class Hash {
 	 * @return SHA1 value.
 	 */
 	public String getSHA1Text() {
-		byte[] sha1Bytes = getSHA1Value();
-		StringBuffer strBuffer = new StringBuffer();
-		for (byte aByte : sha1Bytes) {
-			strBuffer.append(String.format("%1$02x", aByte));
+		return getHexText(getSHA1Value());
+	}
+	
+	/**
+	 * Computes and returns SHA-512 value.
+	 * @return a byte array of SHA-512 value.
+	 */
+	public byte[] getSHA512Value() {
+		if (sha512Value == null) {
+			sha512Value = sha512.digest(); 
 		}
-		return strBuffer.toString();
+		return sha512Value;
+	}
+	
+	/** 
+	 * Returns a hexadecimal string representation of SHA-512 value.
+	 * @return SHA-512 value.
+	 */
+	public String getSHA512Text() {
+		return getHexText(getSHA512Value());
 	}
 	
 	/**
@@ -159,5 +195,13 @@ public class Hash {
 	 */
 	public String getCRC32Text() {
 		return String.format("%1$08x", getCRC32Value());
+	}
+	
+	private String getHexText(byte[] bytes) {
+		StringBuffer strBuffer = new StringBuffer();
+		for (byte aByte : bytes) {
+			strBuffer.append(String.format("%1$02x", aByte));
+		}
+		return strBuffer.toString();
 	}
 }
