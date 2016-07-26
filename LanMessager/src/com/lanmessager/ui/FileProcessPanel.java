@@ -9,6 +9,7 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
 import com.lanmessager.file.FileDigestResult;
+import com.lanmessager.file.FileLength;
 
 public abstract class FileProcessPanel extends JPanel {
 	
@@ -25,6 +26,7 @@ public abstract class FileProcessPanel extends JPanel {
 	
 	private static final int PROGRESS_BAR_MIN = 0;
 	private static final int PROGRESS_BAR_MAX = 100;
+	private static final String PROGRESS_LABEL_TEXT = "%s / %s";
 	
 	private static final String STATUS_LABEL_TEXT_INITIALIZE = "Ready to process file: %s";
 	private static final String STATUS_LABEL_TEXT_ABORT = "Processing file is aborted: %s";
@@ -34,6 +36,8 @@ public abstract class FileProcessPanel extends JPanel {
 	private static final String STATUS_LABEL_TEXT_CANCEL = "Processing file is canceled: %s";
 	
 	protected final JLabel statusLabel;
+	
+	protected final JLabel progressLabel;
 	
 	protected final JProgressBar progressBar;
 	
@@ -50,6 +54,7 @@ public abstract class FileProcessPanel extends JPanel {
 		statusLabel = new JLabel(String.format(getStatusLabelTextInitialize(), fileName));
 		add(statusLabel);
 		
+		progressLabel = new JLabel();
 		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);
 		cancelButton = new JButton(getCancelButtonText());
 	}
@@ -57,12 +62,17 @@ public abstract class FileProcessPanel extends JPanel {
 	public void updateProgress(long processed, long total) {
 		int percent = (int) (processed * PROGRESS_BAR_MAX / total);
 		progressBar.setValue(percent);
+		
+		progressLabel.setText(String.format(PROGRESS_LABEL_TEXT, 
+				new FileLength(processed).toString(),
+				new FileLength(total).toString()));
 	}
 	
 	public void complete(FileDigestResult result) {
 		statusLabel.setText(String.format(getStatusLabelTextSucceed(), fileName));
 		
 		progressBar.setValue(PROGRESS_BAR_MAX);
+		remove(progressLabel);
 		
 		remove(cancelButton);
 		
@@ -92,6 +102,7 @@ public abstract class FileProcessPanel extends JPanel {
 	public void start() {
 		statusLabel.setText(String.format(getStatusLabelTextStart(), fileName));
 		
+		add(progressLabel);
 		add(progressBar);		
 		add(cancelButton);
 		
