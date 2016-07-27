@@ -1,6 +1,7 @@
 package com.lanmessager.ui;
 
 import java.awt.event.ActionListener;
+import java.util.Date;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -26,7 +27,7 @@ public abstract class FileProcessPanel extends JPanel {
 	
 	private static final int PROGRESS_BAR_MIN = 0;
 	private static final int PROGRESS_BAR_MAX = 100;
-	private static final String PROGRESS_LABEL_TEXT = "%s / %s";
+	private static final String PROGRESS_LABEL_TEXT = "%s / %s (%s / s)";
 	
 	private static final String STATUS_LABEL_TEXT_INITIALIZE = "Ready to process file: %s";
 	private static final String STATUS_LABEL_TEXT_ABORT = "Processing file is aborted: %s";
@@ -44,6 +45,10 @@ public abstract class FileProcessPanel extends JPanel {
 	protected final JButton cancelButton;
 	
 	protected final String fileName;
+	
+	protected long lastProcessed = 0;
+	
+	protected Date lastUpdateTime = null;
 	
 	public FileProcessPanel(String fileName) {
 		this.fileName = fileName;
@@ -63,9 +68,19 @@ public abstract class FileProcessPanel extends JPanel {
 		int percent = (int) (processed * PROGRESS_BAR_MAX / total);
 		progressBar.setValue(percent);
 		
+		long updateProcessed = processed - lastProcessed;
+		Date now = new Date();
+		long updateTime = now.getTime() - lastUpdateTime.getTime();
+		float updateSecond = updateTime / 1000f;
+		long updatePerSecond = (long) (updateProcessed / updateSecond);
+		
 		progressLabel.setText(String.format(PROGRESS_LABEL_TEXT, 
 				new FileLength(processed).toString(),
-				new FileLength(total).toString()));
+				new FileLength(total).toString(),
+				new FileLength(updatePerSecond)));
+		
+		lastProcessed = processed;
+		lastUpdateTime = now;
 	}
 	
 	public void complete(FileDigestResult result) {
@@ -107,6 +122,9 @@ public abstract class FileProcessPanel extends JPanel {
 		add(cancelButton);
 		
 		validate();
+		
+		// Add start time as first update time.
+		lastUpdateTime = new Date();
 	}
 	
 	public void cancel() {

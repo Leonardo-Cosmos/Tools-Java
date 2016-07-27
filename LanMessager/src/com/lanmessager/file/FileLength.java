@@ -4,7 +4,9 @@ public class FileLength {
 	
 	private long length;
 	
-	private String[] UNITS = {"B", "KB", "MB", "GB"};
+	private static final String[] UNITS = {"B", "KB", "MB", "GB"};
+	
+	private static final String FORMAT = "%.3f%s";
 	
 	/**
 	 * Initialize FileLength by file length number.
@@ -15,19 +17,18 @@ public class FileLength {
 	}
 	
 	private String convertUnit(long length) {
-		long number = length;
-		String unit = null;
-		for (int i = 0; i < UNITS.length; i++) {
-			unit = UNITS[i];
-			
-			if (number >> 10 > 0) {
-				number >>= 10;
+		float number = length;
+		String unit = UNITS[0];
+		for (int i = 1; i < UNITS.length; i++) {			
+			if (number / 0x400 > 1.000f) {
+				number /= 0x400;
+				unit = UNITS[i];
 			} else {
 				break;
 			}
 		}
 		
-		return Long.toString(number).concat(unit);
+		return String.format(FORMAT, number, unit);
 	}
 	
 	@Override
