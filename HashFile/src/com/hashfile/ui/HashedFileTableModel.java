@@ -18,10 +18,10 @@ public class HashedFileTableModel extends AbstractTableModel {
 	 */
 	private static final long serialVersionUID = -3201633510948863362L;
 
-	private static final int HASHED_FILE_COLUMN_COUNT = 6;
+	//private static final int HASHED_FILE_COLUMN_COUNT = 6;
 	
 	private static final String[] COLUMN_NAMES = 
-		new String[] {"File Name", "Directory", "MD5", "SHA1", "SHA-512", "CRC32"};
+		new String[] {"File Name", "Directory", "MD5", "SHA1", "SHA-256", "SHA-512", "CRC32"};
 	
 	private boolean isUpperCase;
 	
@@ -37,7 +37,7 @@ public class HashedFileTableModel extends AbstractTableModel {
 	
 	@Override
 	public int getColumnCount() {
-		return HASHED_FILE_COLUMN_COUNT;
+		return COLUMN_NAMES.length;
 	}
 
 	@Override
@@ -81,13 +81,21 @@ public class HashedFileTableModel extends AbstractTableModel {
 				
 			case 4:
 				if (isLowerCase()) {
+					result = hashedFile.getHash().getSHA256Text().toLowerCase();
+				} else {
+					result = hashedFile.getHash().getSHA256Text().toUpperCase();
+				}
+				break;
+				
+			case 5:
+				if (isLowerCase()) {
 					result = hashedFile.getHash().getSHA512Text().toLowerCase();
 				} else {
 					result = hashedFile.getHash().getSHA512Text().toUpperCase();
 				}
 				break;
 				
-			case 5:
+			case 6:
 				if (isLowerCase()) {
 					result = hashedFile.getHash().getCRC32Text().toLowerCase();
 				} else {

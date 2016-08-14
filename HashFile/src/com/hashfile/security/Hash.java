@@ -19,6 +19,10 @@ public class Hash {
 	
 	private byte[] sha1Value;
 	
+	private MessageDigest sha256;
+	
+	private byte[] sha256Value;
+	
 	private MessageDigest sha512;
 	
 	private byte[] sha512Value;
@@ -44,6 +48,12 @@ public class Hash {
 		}
 		
 		try {
+			sha256 = MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		
+		try {
 			sha512 = MessageDigest.getInstance("SHA-512");
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
@@ -53,6 +63,7 @@ public class Hash {
 		
 		md5Value = null;
 		sha1Value = null;
+		sha256Value = null;
 		sha512Value = null;
 		crc32Value = 0;
 	}
@@ -63,6 +74,7 @@ public class Hash {
 	public void reset() {
 		md5.reset();
 		sha1.reset();
+		sha256.reset();
 		sha512.reset();
 		crc32.reset();
 	}
@@ -80,6 +92,11 @@ public class Hash {
 		sha1.update(input);
 		if (sha1Value != null) {
 			sha1Value = null;
+		}
+		
+		sha256.update(input);
+		if (sha256Value != null) {
+			sha256Value = null;
 		}
 		
 		sha512.update(input);
@@ -108,6 +125,11 @@ public class Hash {
 		sha1.update(input, offset, length);
 		if (sha1Value != null) {
 			sha1Value = null;
+		}
+		
+		sha256.update(input, offset, length);
+		if (sha256Value != null) {
+			sha256Value = null;
 		}
 		
 		sha512.update(input, offset, length);
@@ -157,6 +179,25 @@ public class Hash {
 	 */
 	public String getSHA1Text() {
 		return getHexText(getSHA1Value());
+	}
+	
+	/**
+	 * Computes and returns SHA-256 value.
+	 * @return a byte array of SHA-256 value.
+	 */
+	public byte[] getSHA256Value() {
+		if (sha256Value == null) {
+			sha256Value = sha256.digest(); 
+		}
+		return sha256Value;
+	}
+	
+	/** 
+	 * Returns a hexadecimal string representation of SHA-256 value.
+	 * @return SHA-256 value.
+	 */
+	public String getSHA256Text() {
+		return getHexText(getSHA256Value());
 	}
 	
 	/**
