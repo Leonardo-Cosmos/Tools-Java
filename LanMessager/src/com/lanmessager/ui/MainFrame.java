@@ -376,7 +376,7 @@ public class MainFrame extends JFrame {
 			} else if (event.isFailed()) {
 				task.getPanel().fail(event.getCause().getMessage());
 			} else {
-				task.getPanel().complete(event.getFileDigestResult());
+				task.getPanel().succeed(event.getFileDigestResult());
 			}
 			digestFileTaskMap.remove(event.getFileId());
 		});
@@ -403,7 +403,7 @@ public class MainFrame extends JFrame {
 			} else if (event.isFailed()) {
 				panel.fail(event.getCause().getMessage());
 			} else {
-				panel.complete(event.getFileDigestResult());
+				panel.succeed(event.getFileDigestResult());
 			}			
 		});
 		fileSendWorker.addProgressUpdatedListeners(event -> {
@@ -428,7 +428,7 @@ public class MainFrame extends JFrame {
 			} else if (event.isFailed()) {
 				panel.fail(event.getCause().getMessage());
 			} else {
-				panel.complete(event.getFileDigestResult());
+				panel.succeed(event.getFileDigestResult());
 			}
 		});
 		fileReceiveWorker.addProgressUpdatedListeners(event -> {

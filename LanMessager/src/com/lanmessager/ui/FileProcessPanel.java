@@ -21,6 +21,13 @@ public abstract class FileProcessPanel extends JPanel {
 	 */
 	private static final long serialVersionUID = 1L;
 	
+	public static final String STATUS_INITIALIZE = "Initialize";
+	public static final String STATUS_ABORT = "Abort";
+	public static final String STATUS_START = "Start";
+	public static final String STATUS_SUCCEED = "Succeed";
+	public static final String STATUS_FAIL = "Fail";
+	public static final String STATUS_CANCEL = "Cancel";
+	
 	private static final String MD5_LABEL_TEXT = "MD5: %s";
 	private static final String SHA1_LABEL_TEXT = "SHA1: %s";
 	private static final String SHA256_LABEL_TEXT = "SHA256: %s";
@@ -52,6 +59,8 @@ public abstract class FileProcessPanel extends JPanel {
 	
 	protected Date lastUpdateTime = null;
 	
+	private String status;
+	
 	public FileProcessPanel(String fileName) {
 		this.fileName = fileName;
 		
@@ -66,6 +75,8 @@ public abstract class FileProcessPanel extends JPanel {
 		progressLabel = new JLabel();
 		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);
 		cancelButton = new JButton(getCancelButtonText());
+		
+		status = STATUS_INITIALIZE;
 	}
 	
 	public void updateProgress(long processed, long total) {
@@ -87,7 +98,7 @@ public abstract class FileProcessPanel extends JPanel {
 		lastUpdateTime = now;
 	}
 	
-	public void complete(FileDigestResult result) {
+	public void succeed(FileDigestResult result) {
 		statusLabel.setText(String.format(getStatusLabelTextSucceed(), fileName));
 		
 		progressBar.setValue(PROGRESS_BAR_MAX);
@@ -100,6 +111,7 @@ public abstract class FileProcessPanel extends JPanel {
 		add(new JLabel(String.format(SHA256_LABEL_TEXT, result.getSha256HexString())));
 		
 		validate();
+		status = STATUS_SUCCEED;
 	}
 	
 	public void fail(String cause) {
@@ -110,12 +122,14 @@ public abstract class FileProcessPanel extends JPanel {
 		add(new JLabel(cause));
 		
 		validate();
+		status = STATUS_FAIL;
 	}
 	
 	public void abort() {
 		statusLabel.setText(String.format(getStatusLabelTextAbort(), fileName));
 		
 		validate();
+		status = STATUS_ABORT;
 	}
 	
 	public void start() {
@@ -126,6 +140,7 @@ public abstract class FileProcessPanel extends JPanel {
 		add(cancelButton);
 		
 		validate();
+		status = STATUS_START;
 		
 		// Add start time as first update time.
 		lastUpdateTime = new Date();
@@ -137,6 +152,7 @@ public abstract class FileProcessPanel extends JPanel {
 		remove(cancelButton);
 		
 		validate();
+		status = STATUS_CANCEL;
 	}
 	
 	public void addCancelButtonActionListener(ActionListener l) {
@@ -147,6 +163,10 @@ public abstract class FileProcessPanel extends JPanel {
 		cancelButton.removeActionListener(l);
 	}
 	
+	public String getStatus() {
+		return status;
+	}
+
 	protected String getCancelButtonText() {
 		return CANCEL_BUTTON_TEXT;
 	}
