@@ -1,8 +1,10 @@
 package com.lanmessager.ui;
 
+import java.awt.Color;
 import java.awt.event.ActionListener;
 import java.util.Date;
 
+import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -55,6 +57,8 @@ public abstract class FileProcessPanel extends JPanel {
 		
 		BoxLayout boxLayout = new BoxLayout(this, BoxLayout.Y_AXIS);
 		setLayout(boxLayout);
+		
+		setBorder(BorderFactory.createLineBorder(Color.BLACK));
 		
 		statusLabel = new JLabel(String.format(getStatusLabelTextInitialize(), fileName));
 		add(statusLabel);
