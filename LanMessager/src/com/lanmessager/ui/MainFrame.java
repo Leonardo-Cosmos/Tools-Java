@@ -500,6 +500,8 @@ public class MainFrame extends JFrame {
 	}
 	
 	private void addFriend(String name, String address) {
+		LOGGER.info(String.format("Add friend: %s (%s)", name, address));
+		
 		if (name == null || address == null) {
 			LOGGER.info("Ignore empty friend information.");
 			return;
@@ -547,6 +549,7 @@ public class MainFrame extends JFrame {
 	}
 	
 	private void removeFriend(String name, String address) {
+		LOGGER.info(String.format("Remove friend: %s (%s)", name, address));
 		for (int i = 0; i < friendListModel.size(); i++) {
 			FriendInfo friendInfo = friendListModel.getElementAt(i);
 			if (friendInfo.getAddress().equals(address)) {
@@ -561,6 +564,8 @@ public class MainFrame extends JFrame {
 		if (JFileChooser.APPROVE_OPTION == openFileOption) {
 			File file = openFileChooser.getSelectedFile();			
 			String fileId = FileIdentifier.generateIdentifierString(file);
+			
+			LOGGER.info(String.format("Digest file: %s", file.getAbsolutePath()));
 			
 			DigestFilePanel panel = new DigestFilePanel(file.getName());
 			addPanel(panel);
@@ -601,6 +606,8 @@ public class MainFrame extends JFrame {
 		if (JFileChooser.APPROVE_OPTION == openFileOption) {
 			File file = openFileChooser.getSelectedFile();
 			String fileId = FileIdentifier.generateIdentifierString(file);
+			
+			LOGGER.info(String.format("Send file %s to %s", file.getAbsoluteFile(), receiverAddress));
 
 			fileSendWorker.register(receiverAddress, fileId, file, file.length());
 
@@ -662,6 +669,9 @@ public class MainFrame extends JFrame {
 			int saveFileOption = saveFileChooser.showSaveDialog(this);
 			if (JFileChooser.APPROVE_OPTION == saveFileOption) {
 				File file = saveFileChooser.getSelectedFile();
+				
+				LOGGER.info(String.format("Receive file %s from %s", file.getAbsolutePath(), senderAddress));
+				
 				startReceiveFile(file, fileSize, fileId, senderAddress);
 
 				
@@ -724,6 +734,8 @@ public class MainFrame extends JFrame {
 			return;
 		}
 
+		LOGGER.info(String.format("Change user name to %s", name));
+		
 		setUserName(name);
 	}
 	
