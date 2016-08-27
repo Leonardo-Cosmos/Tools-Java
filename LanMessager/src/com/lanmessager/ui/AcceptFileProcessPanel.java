@@ -10,6 +10,9 @@ public abstract class AcceptFileProcessPanel extends FileProcessPanel {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
+
+	private static final String ACCEPT_BUTTON_TEXT = "Accept";
+	private static final String ABORT_BUTTON_TEXT = "Abort";
 	
 	private final JButton acceptButton;
 	
@@ -18,10 +21,10 @@ public abstract class AcceptFileProcessPanel extends FileProcessPanel {
 	public AcceptFileProcessPanel(String fileName) {
 		super(fileName);
 		
-		acceptButton = new JButton("Accept");
+		acceptButton = new JButton(getAcceptButtonText());
 		add(acceptButton);
 		
-		abortButton = new JButton("Abort");
+		abortButton = new JButton(getAbortButtonText());
 		add(abortButton);
 	}
 	
@@ -39,6 +42,14 @@ public abstract class AcceptFileProcessPanel extends FileProcessPanel {
 		remove(abortButton);
 		
 		super.abort();
+	}
+	
+	protected String getAcceptButtonText() {
+		return ACCEPT_BUTTON_TEXT;
+	}
+	
+	protected String getAbortButtonText() {
+		return ABORT_BUTTON_TEXT;
 	}
 
 	public void addAcceptButtonActionListener(ActionListener l) {
