@@ -10,7 +10,10 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
@@ -62,6 +65,7 @@ public class MainFrame extends JFrame {
 	private static final String FILE_MENU_TEXT = "File";
 	private static final String SEND_FILE_MENU_ITEM_TEXT = "Send file to friend...";
 	private static final String DIGEST_FILE_MENU_ITEM_TEXT = "Digest file...";
+	private static final String CLEAR_MENU_ITEM_TEXT = "Clear ";
 	
 	private static final String FRIEND_MENU_TEXT = "Friend";
 	private static final String REFRESH_FRIEND_LIST_MENU_ITEM_TEXT = "Refresh friend list";
@@ -85,6 +89,8 @@ public class MainFrame extends JFrame {
 	private Map<String, SendFilePanel> sendFilePanelMap = new HashMap<>();
 	private Map<String, ReceiveFilePanel> receiveFilePanelMap = new HashMap<>();
 
+	private Set<FileProcessPanel> taskPanelSet = new HashSet<>();
+	
 	private static HostInfo localHostInfo;
 	private String userName;
 
@@ -248,6 +254,12 @@ public class MainFrame extends JFrame {
 			digestFile();
 		});
 		fileMenu.add(digestMenuItem);
+		
+		JMenuItem clearMenuItem = new JMenuItem(CLEAR_MENU_ITEM_TEXT);
+		clearMenuItem.addActionListener(e -> {
+			clearCompletedTask();
+		});
+		fileMenu.add(clearMenuItem);
 
 		menuBar.add(fileMenu);
 		
@@ -568,7 +580,7 @@ public class MainFrame extends JFrame {
 			LOGGER.info(String.format("Digest file: %s", file.getAbsolutePath()));
 			
 			DigestFilePanel panel = new DigestFilePanel(file.getName());
-			addPanel(panel);
+			addFileProcessPanel(panel);
 			panel.addCancelButtonActionListener(event -> {
 				digestWorker.cancel(fileId);
 			});
@@ -612,7 +624,7 @@ public class MainFrame extends JFrame {
 			fileSendWorker.register(receiverAddress, fileId, file, file.length());
 
 			SendFilePanel panel = new SendFilePanel(file.getName(), getFriendName(receiverAddress));
-			addPanel(panel);
+			addFileProcessPanel(panel);
 			sendFilePanelMap.put(fileId, panel);
 			panel.addCancelButtonActionListener(event -> cancelSendFile(fileId));
 			
@@ -656,7 +668,7 @@ public class MainFrame extends JFrame {
 
 	private void prepareReceiveFile(String fileName, long fileSize, String fileId, String senderAddress) {
 		ReceiveFilePanel panel = new ReceiveFilePanel(fileName, getFriendName(senderAddress));
-		addPanel(panel);
+		addFileProcessPanel(panel);
 		receiveFilePanelMap.put(fileId, panel);
 		panel.addCancelButtonActionListener(event -> cancelReceiveFile(fileId));		
 		panel.addAcceptButtonActionListener(e -> {
@@ -722,6 +734,31 @@ public class MainFrame extends JFrame {
 		fileReceiveWorker.cancel(fileId);
 	}
 	
+	private void clearCompletedTask() {
+		// Find out panels to be removed.
+		Set<FileProcessPanel> removeSet = new HashSet<>(); 
+		for (FileProcessPanel panel : taskPanelSet) {
+			String status = panel.getStatus();
+			if (FileProcessPanel.STATUS_ABORT.equals(status) ||
+					FileProcessPanel.STATUS_CANCEL.equals(status) ||
+					FileProcessPanel.STATUS_SUCCEED.equals(status) ||
+					FileProcessPanel.STATUS_FAIL.equals(status)) {
+				LOGGER.debug("To remove " + panel.fileName);
+				removeSet.add(panel);
+			}
+		}
+		
+		// Remove found out panels.
+		if (removeSet.size() > 0) {
+			for (FileProcessPanel panel : removeSet) {
+				LOGGER.debug("Remove " + panel.fileName);
+				chatPanel.remove(panel);
+				taskPanelSet.remove(panel);
+			}
+			chatPanel.validate();
+		}
+	}
+	
 	private void changeUserName() {
 		String name = (String) JOptionPane.showInputDialog(this, "Name", "Change user name",
 				JOptionPane.QUESTION_MESSAGE, null, null, getUserName());
@@ -753,10 +790,16 @@ public class MainFrame extends JFrame {
 		}
 		return address;
 	}
-
+	
 	private void addPanel(JPanel panel) {
 		chatPanel.add(Box.createVerticalStrut(10));
 		chatPanel.add(panel);
 		chatPanel.validate();
 	}
+	
+	private void addFileProcessPanel(FileProcessPanel panel) {
+		taskPanelSet.add(panel);
+		addPanel(panel);
+	}
+	
 }
