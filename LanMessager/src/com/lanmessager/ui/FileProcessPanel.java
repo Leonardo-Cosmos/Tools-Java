@@ -8,13 +8,12 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
 import com.lanmessager.file.FileDigestResult;
 import com.lanmessager.file.FileLength;
 
-public abstract class FileProcessPanel extends JPanel {
+public abstract class FileProcessPanel extends ChatMessagePanel {
 	
 	/**
 	 * 
