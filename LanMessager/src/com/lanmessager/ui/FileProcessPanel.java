@@ -9,6 +9,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JProgressBar;
+import javax.swing.border.BevelBorder;
 
 import com.lanmessager.file.FileDigestResult;
 import com.lanmessager.file.FileLength;
@@ -66,7 +67,7 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 		BoxLayout boxLayout = new BoxLayout(this, BoxLayout.Y_AXIS);
 		setLayout(boxLayout);
 		
-		setBorder(BorderFactory.createLineBorder(Color.BLACK));
+		setBorder(BorderFactory.createEtchedBorder());
 		
 		statusLabel = new JLabel(String.format(getStatusLabelTextInitialize(), fileName));
 		add(statusLabel);
