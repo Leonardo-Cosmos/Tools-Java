@@ -1,6 +1,5 @@
 package com.lanmessager.ui;
 
-import java.awt.Color;
 import java.awt.event.ActionListener;
 import java.util.Date;
 
@@ -9,8 +8,6 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JProgressBar;
-import javax.swing.border.BevelBorder;
-
 import com.lanmessager.file.FileDigestResult;
 import com.lanmessager.file.FileLength;
 
