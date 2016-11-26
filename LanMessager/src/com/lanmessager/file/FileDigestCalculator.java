@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.apache.log4j.Logger;
 
-import com.lanmessager.backgroundworker.FileProgress;
 import com.lanmessager.concurrent.Task;
 import com.lanmessager.concurrent.TaskExecutor;
+import com.lanmessager.worker.FileProgress;
 
 public class FileDigestCalculator extends TaskExecutor<String, FileDigestResult, FileProgress> {
 	private static final Logger LOGGER = Logger.getLogger(FileDigestCalculator.class.getSimpleName());

@@ -27,24 +27,24 @@ import javax.swing.WindowConstants;
 
 import org.apache.log4j.Logger;
 
-import com.lanmessager.backgroundworker.ChatReceiveWorker;
-import com.lanmessager.backgroundworker.ChatSendWorker;
-import com.lanmessager.backgroundworker.DigestFileWorker;
-import com.lanmessager.backgroundworker.FileReceiveWorker;
-import com.lanmessager.backgroundworker.FileSendWorker;
-import com.lanmessager.backgroundworker.NotifyReceiveWorker;
-import com.lanmessager.backgroundworker.NotifySendWorker;
-import com.lanmessager.communication.TransferFileServer;
-import com.lanmessager.communication.host.HostInfo;
-import com.lanmessager.communication.host.HostInfoHelper;
-import com.lanmessager.communication.message.FriendOfflineMessage;
-import com.lanmessager.communication.message.FriendOnlineMessage;
-import com.lanmessager.communication.message.ReceiveFileMessage;
-import com.lanmessager.communication.message.SendFileMessage;
 import com.lanmessager.config.UserConfig;
 import com.lanmessager.file.FileIdentifier;
 import com.lanmessager.module.DigestFileTask;
 import com.lanmessager.module.FriendInfo;
+import com.lanmessager.net.TransferFileServer;
+import com.lanmessager.net.host.HostInfo;
+import com.lanmessager.net.host.HostInfoHelper;
+import com.lanmessager.net.message.FriendOfflineMessage;
+import com.lanmessager.net.message.FriendOnlineMessage;
+import com.lanmessager.net.message.ReceiveFileMessage;
+import com.lanmessager.net.message.SendFileMessage;
+import com.lanmessager.worker.ChatReceiveWorker;
+import com.lanmessager.worker.ChatSendWorker;
+import com.lanmessager.worker.DigestFileWorker;
+import com.lanmessager.worker.FileReceiveWorker;
+import com.lanmessager.worker.FileSendWorker;
+import com.lanmessager.worker.NotifyReceiveWorker;
+import com.lanmessager.worker.NotifySendWorker;
 
 public class MainFrame extends JFrame {
 	/**
