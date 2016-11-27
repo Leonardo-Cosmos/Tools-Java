@@ -31,12 +31,16 @@ import com.lanmessager.config.UserConfig;
 import com.lanmessager.file.FileIdentifier;
 import com.lanmessager.module.DigestFileTask;
 import com.lanmessager.module.FriendInfo;
+import com.lanmessager.module.ReceiveDirTask;
+import com.lanmessager.module.SendDirTask;
 import com.lanmessager.net.TransferFileServer;
 import com.lanmessager.net.host.HostInfo;
 import com.lanmessager.net.host.HostInfoHelper;
 import com.lanmessager.net.message.FriendOfflineMessage;
 import com.lanmessager.net.message.FriendOnlineMessage;
+import com.lanmessager.net.message.ReceiveDirMessage;
 import com.lanmessager.net.message.ReceiveFileMessage;
+import com.lanmessager.net.message.SendDirMessage;
 import com.lanmessager.net.message.SendFileMessage;
 import com.lanmessager.worker.ChatReceiveWorker;
 import com.lanmessager.worker.ChatSendWorker;
@@ -58,6 +62,7 @@ public class MainFrame extends JFrame {
 	
 	private static final String FILE_MENU_TEXT = "File";
 	private static final String SEND_FILE_MENU_ITEM_TEXT = "Send file to friend...";
+	private static final String SEND_DIR_MENU_ITEM_TEXT = "Send directory to friend...";
 	private static final String DIGEST_FILE_MENU_ITEM_TEXT = "Digest file...";
 	private static final String CLEAR_MENU_ITEM_TEXT = "Clear ";
 	
@@ -70,8 +75,8 @@ public class MainFrame extends JFrame {
 	private static final String SEND_FILE_POPUP_MENU_ITEM_TEXT = "Send file...";
 	private static final String REMOVE_FRIEND_POPUP_MENU_ITEM_TEXT = "Remove friend";
 	
-	private final JFileChooser openFileChooser = new JFileChooser();
-	private final JFileChooser saveFileChooser = new JFileChooser();
+	private JFileChooser openFileChooser;
+	private JFileChooser saveFileChooser;
 
 	private JPopupMenu popupMenu;
 	private JList<FriendInfo> friendList;
@@ -82,6 +87,8 @@ public class MainFrame extends JFrame {
 	private Map<String, DigestFileTask> digestFileTaskMap = new HashMap<>();
 	private Map<String, SendFilePanel> sendFilePanelMap = new HashMap<>();
 	private Map<String, ReceiveFilePanel> receiveFilePanelMap = new HashMap<>();
+	private Map<String, SendDirTask> sendDirTaskMap = new HashMap<>();
+	private Map<String, ReceiveDirTask> receiveDirTaskMap = new HashMap<>();
 	
 	private static HostInfo localHostInfo;
 	private String userName;
@@ -235,11 +242,17 @@ public class MainFrame extends JFrame {
 		JMenuBar menuBar = new JMenuBar();
 		JMenu fileMenu = new JMenu(FILE_MENU_TEXT);
 
-		JMenuItem sendMenuItem = new JMenuItem(SEND_FILE_MENU_ITEM_TEXT);
-		sendMenuItem.addActionListener(e -> {
+		JMenuItem sendFileMenuItem = new JMenuItem(SEND_FILE_MENU_ITEM_TEXT);
+		sendFileMenuItem.addActionListener(e -> {
 			sendFileToSelectedFriend();
 		});
-		fileMenu.add(sendMenuItem);
+		fileMenu.add(sendFileMenuItem);
+		
+		JMenuItem sendDirMenuItem = new JMenuItem(SEND_DIR_MENU_ITEM_TEXT);
+		sendDirMenuItem.addActionListener(e -> {
+			sendDirectoryToSelectedFriend();
+		});
+		fileMenu.add(sendDirMenuItem);
 		
 		JMenuItem digestMenuItem = new JMenuItem(DIGEST_FILE_MENU_ITEM_TEXT);
 		digestMenuItem.addActionListener(e -> {
@@ -328,6 +341,9 @@ public class MainFrame extends JFrame {
 		splitPane.setOneTouchExpandable(true);
 
 		add(splitPane, BorderLayout.CENTER);
+		
+		openFileChooser = new JFileChooser();
+		saveFileChooser = new JFileChooser();
 	}
 
 	private void initWorker() {
@@ -358,6 +374,19 @@ public class MainFrame extends JFrame {
 				startSendFile(message.getFileId());
 			} else {
 				abortSendFile(message.getFileId());
+			}
+		});
+		chatReceiver.addSendDirListener(event -> {
+			SendDirMessage message = event.getMessage();
+			prepareReceiveDirectory(message.getDirName(), message.getDirId(), 
+					message.getSenderAddress());
+		});
+		chatReceiver.addReceiveDirListener(event -> {
+			ReceiveDirMessage message = event.getMessage();
+			if (message.isAccept()) {
+				startSendDir(message.getDirId());
+			} else {
+				abortSendDir(message.getDirId());
 			}
 		});
 
@@ -604,12 +633,13 @@ public class MainFrame extends JFrame {
 	}
 	
 	private void prepareSendFile(String receiverAddress) {
+		openFileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
 		int openFileOption = openFileChooser.showOpenDialog(this);
 		if (JFileChooser.APPROVE_OPTION == openFileOption) {
 			File file = openFileChooser.getSelectedFile();
 			String fileId = FileIdentifier.generateIdentifierString(file);
 			
-			LOGGER.info(String.format("Send file %s to %s", file.getAbsoluteFile(), receiverAddress));
+			LOGGER.info(String.format("Send file %s to %s", file.getAbsolutePath(), receiverAddress));
 
 			fileSendWorker.register(receiverAddress, fileId, file, file.length());
 
@@ -668,6 +698,7 @@ public class MainFrame extends JFrame {
 			} else {
 				saveFileChooser.setSelectedFile(new File(fileName));
 			}
+			saveFileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
 			int saveFileOption = saveFileChooser.showSaveDialog(this);
 			if (JFileChooser.APPROVE_OPTION == saveFileOption) {
 				File file = saveFileChooser.getSelectedFile();
@@ -724,6 +755,130 @@ public class MainFrame extends JFrame {
 		fileReceiveWorker.cancel(fileId);
 	}
 	
+	private void sendDirectoryToSelectedFriend() {
+		FriendInfo friendInfo = getSelectedFriend();
+		if (friendInfo != null) {
+			String receiverAddress = friendInfo.getAddress();
+			prepareSendDirectory(receiverAddress);
+		}
+	}
+	
+	private void prepareSendDirectory(String receiverAddress) {
+		openFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+		int openFileOption = openFileChooser.showOpenDialog(this);
+		if (JFileChooser.APPROVE_OPTION == openFileOption) {
+			File dir = openFileChooser.getSelectedFile();
+			String dirId = FileIdentifier.generateIdentifierString(dir);
+			
+			LOGGER.info(String.format("Send directory %s to %s", dir.getAbsolutePath(), receiverAddress));
+			
+			SendDirPanel panel = new SendDirPanel(dir.getName(), getFriendName(receiverAddress));
+			panel.addCancelButtonActionListener(event -> cancelSendDirectory(dirId));
+			chatPanel.addPanel(panel);
+			
+			SendDirTask task = new SendDirTask();
+			task.setDir(dir);			
+			task.setPanel(panel);
+			sendDirTaskMap.put(dirId, task);
+			
+			SendDirMessage message = new SendDirMessage();
+			message.setDirName(dir.getName());
+			message.setDirId(dirId);
+			message.setSenderAddress(localHostInfo.getAddress());
+			chatSender.send(receiverAddress, message);
+		}
+	}
+	
+	private void startSendDir(String dirId) {
+		if (!sendDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find send file task: " + dirId);
+			return;
+		}
+		SendDirTask task = sendDirTaskMap.get(dirId);
+		SendDirPanel panel = task.getPanel();
+		panel.start();
+	}
+	
+	private void abortSendDir(String dirId) {
+		if (!sendDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find send file task: " + dirId);
+			return;
+		}
+		SendDirTask task = sendDirTaskMap.get(dirId);
+		SendDirPanel panel = task.getPanel();
+		panel.abort();
+	}
+	
+	private void cancelSendDirectory(String dirId) {
+		
+	}
+	
+	private void prepareReceiveDirectory(String dirName, String dirId, String senderAddress) {
+		ReceiveDirPanel panel = new ReceiveDirPanel(dirName, getFriendName(senderAddress));
+		panel.addCancelButtonActionListener(event -> cancelReceiveDirectory(dirId));
+		panel.addAcceptButtonActionListener(e -> {
+			File savedFile = saveFileChooser.getSelectedFile();
+			if (savedFile != null) {
+				saveFileChooser.setSelectedFile(new File(savedFile.getParent(), dirName));
+			} else {
+				saveFileChooser.setSelectedFile(new File(dirName));
+			}
+			saveFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			int savedFileOption = saveFileChooser.showSaveDialog(this);
+			if (JFileChooser.APPROVE_OPTION == savedFileOption) {
+				File dir = saveFileChooser.getSelectedFile();
+				
+				LOGGER.info(String.format("Receive directory %s from %s", dir.getAbsolutePath(), senderAddress));
+				
+				startReceiveDirectory(dir, dirId, senderAddress);
+			}
+		});
+		panel.addAbortButtonActionListener(e -> {
+			abortReceiveDirectory(dirId, senderAddress);
+		});
+		chatPanel.addPanel(panel);
+		
+		ReceiveDirTask task = new ReceiveDirTask();
+		task.setPanel(panel);
+		receiveDirTaskMap.put(dirId, task);
+	}
+	
+	private void startReceiveDirectory(File dir, String dirId, String senderAddress) {
+		if (!receiveDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find receive directory task: " + dirId);
+			return;
+		}
+		ReceiveDirTask task = receiveDirTaskMap.get(dirId);
+		task.setDir(dir);
+		ReceiveDirPanel panel = task.getPanel();
+		panel.start();
+		
+		ReceiveDirMessage message = new ReceiveDirMessage();
+		message.setAccept(true);
+		message.setDirId(dirId);
+		message.setReceiverPort(TransferFileServer.PORT_TRANSFER_FILE);
+		chatSender.send(senderAddress, message);
+	}
+	
+	private void abortReceiveDirectory(String dirId, String senderAddress) {
+		if (!receiveDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find receive directory task: " + dirId);
+			return;
+		}
+		ReceiveDirTask task = receiveDirTaskMap.get(dirId);
+		ReceiveDirPanel panel = task.getPanel();
+		panel.abort();
+		
+		ReceiveDirMessage message = new ReceiveDirMessage();
+		message.setAccept(false);
+		message.setDirId(dirId);
+		message.setReceiverPort(TransferFileServer.PORT_TRANSFER_FILE);
+		chatSender.send(senderAddress, message);
+	}
+	
+	private void cancelReceiveDirectory(String dirId) {
+		
+	}
 	
 	
 	private void changeUserName() {

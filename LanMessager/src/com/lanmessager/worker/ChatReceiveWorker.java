@@ -9,7 +9,9 @@ import javax.swing.SwingWorker;
 import org.apache.log4j.Logger;
 
 import com.lanmessager.net.ChatServer;
+import com.lanmessager.net.message.ReceiveDirMessage;
 import com.lanmessager.net.message.ReceiveFileMessage;
+import com.lanmessager.net.message.SendDirMessage;
 import com.lanmessager.net.message.SendFileMessage;
 import com.lanmessager.net.packet.Packet;
 import com.lanmessager.net.packet.PacketFactory;
@@ -39,11 +41,17 @@ public class ChatReceiveWorker {
 		switch (packet.getType()) {
 		case PacketFactory.CHAT_TYPE_FILE_SEND:
 			LOGGER.debug("On new send file message.");
-			onSendFile((SendFileMessage) packet.getMessage()); 
+			onSendFile((SendFileMessage) packet.getMessage());
 			break;
 		case PacketFactory.CHAT_TYPE_FILE_RECEIVE:
 			LOGGER.debug("On new receive file message.");
-			onReceiveFileAccept((ReceiveFileMessage) packet.getMessage());
+			onReceiveFile((ReceiveFileMessage) packet.getMessage());
+		case PacketFactory.CHAT_TYPE_DIR_SEND:
+			LOGGER.debug("On new send directory message.");
+			onSendDir((SendDirMessage) packet.getMessage());
+		case PacketFactory.CHAT_TYPE_DIR_RECEIVE:
+			LOGGER.debug("On new receive directory message.");
+			onReceiveDir((ReceiveDirMessage) packet.getMessage());
 		default:
 			break;
 		}
@@ -59,7 +67,7 @@ public class ChatReceiveWorker {
 		}
 	}
 	
-	protected void onReceiveFileAccept(ReceiveFileMessage message) {
+	protected void onReceiveFile(ReceiveFileMessage message) {
 		if (receiveFileListeners != null) {
 			NewMessageEvent<ReceiveFileMessage> event = new NewMessageEvent<>(this);
 			event.setMessage(message);
@@ -69,9 +77,33 @@ public class ChatReceiveWorker {
 		}
 	}
 	
+	protected void onSendDir(SendDirMessage message) {
+		if (sendDirListeners != null) {
+			NewMessageEvent<SendDirMessage> event = new NewMessageEvent<>(this);
+			event.setMessage(message);
+			for (NewMessageListener<SendDirMessage> listener : sendDirListeners) {
+				listener.handle(event);
+			}
+		}
+	}
+	
+	protected void onReceiveDir(ReceiveDirMessage message) {
+		if (receiveDirListeners != null) {
+			NewMessageEvent<ReceiveDirMessage> event = new NewMessageEvent<>(this);
+			event.setMessage(message);
+			for (NewMessageListener<ReceiveDirMessage> listener : receiveDirListeners) {
+				listener.handle(event);
+			}			
+		}
+	}
+	
 	private Set<NewMessageListener<SendFileMessage>> sendFileListeners;
 	
 	private Set<NewMessageListener<ReceiveFileMessage>> receiveFileListeners;
+	
+	private Set<NewMessageListener<SendDirMessage>> sendDirListeners;
+	
+	private Set<NewMessageListener<ReceiveDirMessage>> receiveDirListeners;
 
 	public void addSendFileListener(NewMessageListener<SendFileMessage> listener) {
 		if (sendFileListeners == null) {
@@ -96,6 +128,32 @@ public class ChatReceiveWorker {
 	public void removeReceiveFileListener(NewMessageListener<ReceiveFileMessage> listener) {
 		if (receiveFileListeners != null) {
 			receiveFileListeners.remove(listener);
+		}
+	}
+
+	public void addSendDirListener(NewMessageListener<SendDirMessage> listener) {
+		if (sendDirListeners == null) {
+			sendDirListeners = new HashSet<>();
+		}
+		sendDirListeners.add(listener);
+	}
+	
+	public void removeSendDirListener(NewMessageListener<SendDirMessage> listener) {
+		if (sendDirListeners != null) {
+			sendDirListeners.remove(listener);
+		}
+	}
+
+	public void addReceiveDirListener(NewMessageListener<ReceiveDirMessage> listener) {
+		if (receiveDirListeners == null) {
+			receiveDirListeners = new HashSet<>();
+		}
+		receiveDirListeners.add(listener);
+	}
+
+	public void removeReceiveDirListener(NewMessageListener<ReceiveDirMessage> listener) {
+		if (receiveDirListeners != null) {
+			receiveDirListeners.remove(listener);
 		}
 	}
 	

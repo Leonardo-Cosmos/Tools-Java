@@ -7,7 +7,9 @@ import com.lanmessager.net.message.FriendOfflineMessage;
 import com.lanmessager.net.message.FriendOnlineMessage;
 import com.lanmessager.net.message.Message;
 import com.lanmessager.net.message.MessageJsonConverter;
+import com.lanmessager.net.message.ReceiveDirMessage;
 import com.lanmessager.net.message.ReceiveFileMessage;
+import com.lanmessager.net.message.SendDirMessage;
 import com.lanmessager.net.message.SendFileMessage;
 
 public class PacketFactory {
@@ -18,7 +20,12 @@ public class PacketFactory {
 	public static final int CHAT_TYPE_FILE_SEND = 0x101;
 	public static final int CHAT_TYPE_FILE_SEND_CANCEL = 0x102;
 	public static final int CHAT_TYPE_FILE_RECEIVE = 0x111;
-	//public static final int CHAT_TYPE_FILE_RECEIVE_REJECT = 0x012;
+	public static final int CHAT_TYPE_FILE_RECEIVE_CANCEL = 0x112;
+	
+	public static final int CHAT_TYPE_DIR_SEND = 0x201;
+	public static final int CHAT_TYPE_DIR_SEND_CANCEL = 0x202;
+	public static final int CHAT_TYPE_DIR_RECEIVE = 0x211;
+	public static final int CHAT_TYPE_DIR_RECEIVE_CANCEL = 0x212;
 	
 	private static final int TYPE_LENGTH = 8;
 	private static final int TYPE_RADIX = 16;
@@ -30,7 +37,8 @@ public class PacketFactory {
 		messageClassMap = new HashMap<>();
 		messageClassMap.put(CHAT_TYPE_FILE_SEND, SendFileMessage.class);
 		messageClassMap.put(CHAT_TYPE_FILE_RECEIVE, ReceiveFileMessage.class);
-		//messageClassMap.put(CHAT_TYPE_FILE_RECEIVE_REJECT, ReceiveFileRejectMessage.class);
+		messageClassMap.put(CHAT_TYPE_DIR_SEND, SendDirMessage.class);
+		messageClassMap.put(CHAT_TYPE_DIR_RECEIVE, ReceiveDirMessage.class);
 		messageClassMap.put(NOTIFY_TYPE_FRIEND_ONLINE, FriendOnlineMessage.class);
 		messageClassMap.put(NOTIFY_TYPE_FRIEND_OFFLINE, FriendOfflineMessage.class);
 	}
@@ -41,6 +49,10 @@ public class PacketFactory {
 			type = CHAT_TYPE_FILE_SEND;
 		} else if (message instanceof ReceiveFileMessage) {
 			type = CHAT_TYPE_FILE_RECEIVE;
+		} else if (message instanceof SendDirMessage) {
+			type = CHAT_TYPE_DIR_SEND;
+		} else if (message instanceof ReceiveDirMessage) {
+			type = CHAT_TYPE_DIR_RECEIVE;
 		} else if (message instanceof FriendOnlineMessage) {
 			type = NOTIFY_TYPE_FRIEND_ONLINE;
 		} else if (message instanceof FriendOfflineMessage) {
