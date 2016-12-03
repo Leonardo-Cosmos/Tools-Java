@@ -11,19 +11,12 @@ import javax.swing.JProgressBar;
 import com.lanmessager.file.FileDigestResult;
 import com.lanmessager.file.FileLength;
 
-public abstract class FileProcessPanel extends ChatMessagePanel {
+public abstract class FileProcessPanel extends ProcessPanel {
 	
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	
-	public static final String STATUS_INITIALIZE = "Initialize";
-	public static final String STATUS_ABORT = "Abort";
-	public static final String STATUS_START = "Start";
-	public static final String STATUS_SUCCEED = "Succeed";
-	public static final String STATUS_FAIL = "Fail";
-	public static final String STATUS_CANCEL = "Cancel";
 	
 	private static final String MD5_LABEL_TEXT = "MD5: %s";
 	private static final String SHA1_LABEL_TEXT = "SHA1: %s";
@@ -56,8 +49,6 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 	
 	protected Date lastUpdateTime = null;
 	
-	private String status;
-	
 	public FileProcessPanel(String fileName) {
 		this.fileName = fileName;
 		
@@ -72,8 +63,6 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 		progressLabel = new JLabel();
 		progressBar = new JProgressBar(PROGRESS_BAR_MIN, PROGRESS_BAR_MAX);
 		cancelButton = new JButton(getCancelButtonText());
-		
-		status = STATUS_INITIALIZE;
 	}
 	
 	public void updateProgress(long processed, long total) {
@@ -95,7 +84,8 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 		lastUpdateTime = now;
 	}
 	
-	public void succeed(FileDigestResult result) {
+	@Override
+	public void succeed(Object result) {
 		statusLabel.setText(String.format(getStatusLabelTextSucceed(), fileName));
 		
 		progressBar.setValue(PROGRESS_BAR_MAX);
@@ -103,32 +93,36 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 		
 		remove(cancelButton);
 		
-		add(new JLabel(String.format(MD5_LABEL_TEXT, result.getMd5HexString())));
-		add(new JLabel(String.format(SHA1_LABEL_TEXT, result.getSha1HexString())));
-		add(new JLabel(String.format(SHA256_LABEL_TEXT, result.getSha256HexString())));
+		FileDigestResult fileDigestResult = (FileDigestResult) result;
+		add(new JLabel(String.format(MD5_LABEL_TEXT, fileDigestResult.getMd5HexString())));
+		add(new JLabel(String.format(SHA1_LABEL_TEXT, fileDigestResult.getSha1HexString())));
+		add(new JLabel(String.format(SHA256_LABEL_TEXT, fileDigestResult.getSha256HexString())));
 		
 		validate();
-		status = STATUS_SUCCEED;
+		super.succeed(result);
 	}
 	
-	public void fail(String cause) {
+	@Override
+	public void fail(Object cause) {
 		statusLabel.setText(String.format(getStatusLabelTextFail(), fileName));
 		
 		remove(cancelButton);
 		
-		add(new JLabel(cause));
+		add(new JLabel((String) cause));
 		
 		validate();
-		status = STATUS_FAIL;
+		super.fail(cause);
 	}
 	
+	@Override
 	public void abort() {
 		statusLabel.setText(String.format(getStatusLabelTextAbort(), fileName));
 		
 		validate();
-		status = STATUS_ABORT;
+		super.abort();
 	}
 	
+	@Override
 	public void start() {
 		statusLabel.setText(String.format(getStatusLabelTextStart(), fileName));
 		
@@ -137,19 +131,20 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 		add(cancelButton);
 		
 		validate();
-		status = STATUS_START;
+		super.start();
 		
 		// Add start time as first update time.
 		lastUpdateTime = new Date();
 	}
 	
+	@Override
 	public void cancel() {
 		statusLabel.setText(String.format(getStatusLabelTextCancel(), fileName));
 		
 		remove(cancelButton);
 		
 		validate();
-		status = STATUS_CANCEL;
+		super.cancel();
 	}
 	
 	public void addCancelButtonActionListener(ActionListener l) {
@@ -158,10 +153,6 @@ public abstract class FileProcessPanel extends ChatMessagePanel {
 	
 	public void removeCancelButtonActionListener(ActionListener l) {
 		cancelButton.removeActionListener(l);
-	}
-	
-	public String getStatus() {
-		return status;
 	}
 
 	protected String getCancelButtonText() {

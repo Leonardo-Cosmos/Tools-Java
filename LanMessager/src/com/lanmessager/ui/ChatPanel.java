@@ -20,7 +20,7 @@ public class ChatPanel extends JPanel {
 
 	private static final int VERTICAL_STRUT_HEIGHT = 10;
 	
-	private Set<FileProcessPanel> taskPanelSet = new HashSet<>();
+	private Set<ProcessPanel> taskPanelSet = new HashSet<>();
 
 	public ChatPanel() {
 		initComponents();
@@ -36,8 +36,8 @@ public class ChatPanel extends JPanel {
 			return;
 		}
 		
-		if (panel instanceof FileProcessPanel) {
-			taskPanelSet.add((FileProcessPanel) panel);
+		if (panel instanceof ProcessPanel) {
+			taskPanelSet.add((ProcessPanel) panel);
 		}
 		
 		add(panel);
@@ -68,22 +68,34 @@ public class ChatPanel extends JPanel {
 	
 	public void clearCompletedTaskPanel() {
 		// Find out panels to be removed.
-		final Set<FileProcessPanel> removeSet = new HashSet<>(); 
-		for (FileProcessPanel panel : taskPanelSet) {
+		final Set<ProcessPanel> removeSet = new HashSet<>(); 
+		for (ProcessPanel panel : taskPanelSet) {
 			String status = panel.getStatus();
-			if (FileProcessPanel.STATUS_ABORT.equals(status) ||
-					FileProcessPanel.STATUS_CANCEL.equals(status) ||
-					FileProcessPanel.STATUS_SUCCEED.equals(status) ||
-					FileProcessPanel.STATUS_FAIL.equals(status)) {
-				LOGGER.debug("To remove " + panel.fileName);
+			if (ProcessPanel.STATUS_ABORT.equals(status) ||
+					ProcessPanel.STATUS_CANCEL.equals(status) ||
+					ProcessPanel.STATUS_SUCCEED.equals(status) ||
+					ProcessPanel.STATUS_FAIL.equals(status)) {
+				if (panel instanceof FileProcessPanel) {
+					FileProcessPanel fileProcessPanel = (FileProcessPanel) panel;
+					LOGGER.debug("To remove " + fileProcessPanel.fileName);	
+				} else if (panel instanceof DirProcessPanel) {
+					DirProcessPanel dirProcessPanel = (DirProcessPanel) panel;
+					LOGGER.debug("To remove " + dirProcessPanel.dirName);
+				}
 				removeSet.add(panel);
 			}
 		}
 		
 		// Remove found out panels.
 		if (removeSet.size() > 0) {
-			for (FileProcessPanel panel : removeSet) {
-				LOGGER.debug("Remove " + panel.fileName);
+			for (ProcessPanel panel : removeSet) {
+				if (panel instanceof FileProcessPanel) {
+					FileProcessPanel fileProcessPanel = (FileProcessPanel) panel;
+					LOGGER.debug("Remove " + fileProcessPanel.fileName);	
+				} else if (panel instanceof DirProcessPanel) {
+					DirProcessPanel dirProcessPanel = (DirProcessPanel) panel;
+					LOGGER.debug("Remove " + dirProcessPanel.dirName);
+				}
 				remove(panel);
 				remove(panel.getVerticalStrut());
 				taskPanelSet.remove(panel);

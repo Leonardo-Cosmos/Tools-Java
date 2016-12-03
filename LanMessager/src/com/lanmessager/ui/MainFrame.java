@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
+
 import javax.swing.DefaultListModel;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -28,6 +30,7 @@ import javax.swing.WindowConstants;
 import org.apache.log4j.Logger;
 
 import com.lanmessager.config.UserConfig;
+import com.lanmessager.file.FileQueueGenerator;
 import com.lanmessager.file.FileIdentifier;
 import com.lanmessager.module.DigestFileTask;
 import com.lanmessager.module.FriendInfo;
@@ -89,6 +92,8 @@ public class MainFrame extends JFrame {
 	private Map<String, ReceiveFilePanel> receiveFilePanelMap = new HashMap<>();
 	private Map<String, SendDirTask> sendDirTaskMap = new HashMap<>();
 	private Map<String, ReceiveDirTask> receiveDirTaskMap = new HashMap<>();
+	private Map<String, String> sendFileDirMap = new HashMap<>();
+	private Map<String, String> receiveFileDirMap = new HashMap<>();
 	
 	private static HostInfo localHostInfo;
 	private String userName;
@@ -365,8 +370,14 @@ public class MainFrame extends JFrame {
 		/* Setup chat server. */
 		chatReceiver.addSendFileListener(event -> {
 			SendFileMessage message = event.getMessage();
-			prepareReceiveFile(message.getFileName(), message.getFileSize(), message.getFileId(),
-					message.getSenderAddress());
+			if (message.getDirId() == null) {
+				prepareReceiveFile(message.getFileName(), message.getFileSize(), message.getFileId(),
+						message.getSenderAddress());
+			} else {
+				makeDirAndReceive(message.getSubPath(), message.getDirId(),
+						message.getFileName(), message.getFileSize(),
+						message.getFileId(), message.getSenderAddress());
+			}
 		});
 		chatReceiver.addReceiveFileListener(event -> {
 			ReceiveFileMessage message = event.getMessage();
@@ -435,7 +446,13 @@ public class MainFrame extends JFrame {
 				panel.fail(event.getCause().getMessage());
 			} else {
 				panel.succeed(event.getFileDigestResult());
-			}			
+			}
+			
+			String dirId = sendFileDirMap.get(fileId);
+			if (dirId != null) {
+				pollFileAndSend(dirId);
+				sendFileDirMap.remove(fileId);
+			}
 		});
 		fileSendWorker.addProgressUpdatedListeners(event -> {
 			String fileId = event.getFileId();
@@ -460,6 +477,11 @@ public class MainFrame extends JFrame {
 				panel.fail(event.getCause().getMessage());
 			} else {
 				panel.succeed(event.getFileDigestResult());
+			}
+			
+			String dirId = receiveFileDirMap.get(fileId);
+			if (dirId != null) {
+				receiveFileDirMap.remove(fileId);
 			}
 		});
 		fileReceiveWorker.addProgressUpdatedListeners(event -> {
@@ -678,8 +700,10 @@ public class MainFrame extends JFrame {
 			LOGGER.warn("Cannot find send file panel: " + fileId);
 			return;
 		}
+		fileSendWorker.unregister(fileId);
 		SendFilePanel panel = sendFilePanelMap.get(fileId);
-		panel.abort();		
+		panel.abort();
+		sendFilePanelMap.remove(fileId);
 	}
 
 	private void cancelSendFile(String fileId) {
@@ -743,6 +767,7 @@ public class MainFrame extends JFrame {
 		}
 		ReceiveFilePanel panel = receiveFilePanelMap.get(fileId);
 		panel.abort();
+		receiveFilePanelMap.remove(fileId);
 		
 		ReceiveFileMessage message = new ReceiveFileMessage();
 		message.setAccept(false);
@@ -776,9 +801,13 @@ public class MainFrame extends JFrame {
 			panel.addCancelButtonActionListener(event -> cancelSendDirectory(dirId));
 			chatPanel.addPanel(panel);
 			
+			Queue<String> fileQueue = FileQueueGenerator.getFileQueueOfDir(dir);
+			
 			SendDirTask task = new SendDirTask();
-			task.setDir(dir);			
+			task.setDir(dir);
 			task.setPanel(panel);
+			task.setReceiverAddress(receiverAddress);
+			task.setFileQueue(fileQueue);
 			sendDirTaskMap.put(dirId, task);
 			
 			SendDirMessage message = new SendDirMessage();
@@ -797,6 +826,52 @@ public class MainFrame extends JFrame {
 		SendDirTask task = sendDirTaskMap.get(dirId);
 		SendDirPanel panel = task.getPanel();
 		panel.start();
+		
+		pollFileAndSend(dirId);
+	}
+	
+	private void pollFileAndSend(String dirId) {
+		if (!sendDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find send file task: " + dirId);
+			return;
+		}
+		SendDirTask task = sendDirTaskMap.get(dirId);
+		Queue<String> fileQueue = task.getFileQueue();
+		String filePath = fileQueue.poll();
+		if (filePath == null) {
+			SendDirPanel panel = task.getPanel();
+			panel.succeed(null);
+		} else {
+			String receiverAddress = task.getReceiverAddress();
+			
+			File file = new File(filePath);
+			String fileId = FileIdentifier.generateIdentifierString(file);
+			
+			sendFileDirMap.put(fileId, dirId);
+			
+			File dir = task.getDir();
+			String subPath = filePath.substring(dir.getAbsolutePath().length());
+			
+			LOGGER.info(String.format("Send %s of dir %s to %s",
+					subPath, dir.getAbsolutePath(), receiverAddress));
+			
+			fileSendWorker.register(receiverAddress, fileId, file, file.length());
+			
+			SendDirPanel sendDirPanel = task.getPanel();
+			SendFilePanel sendFilePanel = new SendFilePanel(file.getName(), getFriendName(receiverAddress));
+			sendDirPanel.addPanel(sendFilePanel);
+			sendFilePanelMap.put(fileId, sendFilePanel);
+			sendFilePanel.addCancelButtonActionListener(event -> cancelSendFile(fileId));
+			
+			SendFileMessage message = new SendFileMessage();
+			message.setFileSize(file.length());
+			message.setFileName(file.getName());
+			message.setFileId(fileId);
+			message.setSubPath(subPath);
+			message.setDirId(dirId);
+			message.setSenderAddress(localHostInfo.getAddress());
+			chatSender.send(receiverAddress, message);
+		}
 	}
 	
 	private void abortSendDir(String dirId) {
@@ -856,6 +931,36 @@ public class MainFrame extends JFrame {
 		ReceiveDirMessage message = new ReceiveDirMessage();
 		message.setAccept(true);
 		message.setDirId(dirId);
+		message.setReceiverPort(TransferFileServer.PORT_TRANSFER_FILE);
+		chatSender.send(senderAddress, message);
+	}
+	
+	private void makeDirAndReceive(String subPath, String dirId,
+			String fileName, long fileSize, String fileId, String senderAddress) {
+		if (!receiveDirTaskMap.containsKey(dirId)) {
+			LOGGER.warn("Cannot find receive directory task: " + dirId);
+			return;
+		}
+		receiveFileDirMap.put(fileId, dirId);
+		
+		ReceiveDirTask task = receiveDirTaskMap.get(dirId);
+		File dir = task.getDir();
+		File file = new File(dir, subPath);
+		
+		LOGGER.info(String.format("Receive %s of dir %s to %s",
+				subPath, dir.getAbsolutePath(), senderAddress));
+		
+		ReceiveDirPanel receiveDirPanel = task.getPanel();
+		ReceiveFilePanel receiveFilePanel = new ReceiveFilePanel(fileName, getFriendName(senderAddress));
+		receiveDirPanel.addPanel(receiveFilePanel);
+		receiveFilePanelMap.put(fileId, receiveFilePanel);
+		
+		receiveFilePanel.start();
+		fileReceiveWorker.receive(fileId, file, fileSize);
+		
+		ReceiveFileMessage message = new ReceiveFileMessage();
+		message.setAccept(true);
+		message.setFileId(fileId);
 		message.setReceiverPort(TransferFileServer.PORT_TRANSFER_FILE);
 		chatSender.send(senderAddress, message);
 	}
