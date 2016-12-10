@@ -1,5 +1,7 @@
 package com.lanmessager.net.message;
 
+import java.io.File;
+
 public class SendFileMessage extends Message {
 	private static final String KEY_FILE_SIZE = "fileSize";
 	private static final String KEY_FILE_NAME = "fileName";
@@ -20,7 +22,7 @@ public class SendFileMessage extends Message {
 	private String fileId;
 	
 	@MessageKey(KEY_SUB_PATH)
-	private String subPath;
+	private String[] subPath;
 	
 	@MessageKey(KEY_DIR_ID)
 	private String dirId;
@@ -53,11 +55,11 @@ public class SendFileMessage extends Message {
 	}
 
 	public String getSubPath() {
-		return subPath;
+		return String.join(File.separator, subPath);
 	}
 
 	public void setSubPath(String subPath) {
-		this.subPath = subPath;
+		this.subPath = subPath.split(File.separator);
 	}
 
 	public String getDirId() {
