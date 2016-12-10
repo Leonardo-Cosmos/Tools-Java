@@ -46,12 +46,15 @@ public class ChatReceiveWorker {
 		case PacketFactory.CHAT_TYPE_FILE_RECEIVE:
 			LOGGER.debug("On new receive file message.");
 			onReceiveFile((ReceiveFileMessage) packet.getMessage());
+			break;
 		case PacketFactory.CHAT_TYPE_DIR_SEND:
 			LOGGER.debug("On new send directory message.");
 			onSendDir((SendDirMessage) packet.getMessage());
+			break;
 		case PacketFactory.CHAT_TYPE_DIR_RECEIVE:
 			LOGGER.debug("On new receive directory message.");
 			onReceiveDir((ReceiveDirMessage) packet.getMessage());
+			break;
 		default:
 			break;
 		}
