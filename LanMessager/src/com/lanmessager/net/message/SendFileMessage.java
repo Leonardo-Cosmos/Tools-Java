@@ -12,6 +12,9 @@ public class SendFileMessage extends Message {
 	
 	private static final String KEY_SENDER_ADDRESS = "senderAddress";
 	
+	private static final String FILE_PATH_JOIN_DELIMITER = File.separator;
+	private static final String FILE_PATH_SPLIT_DELIMITER = "\\" + File.separator;
+	
 	@MessageKey(KEY_FILE_SIZE)
 	private long fileSize;
 
@@ -55,11 +58,11 @@ public class SendFileMessage extends Message {
 	}
 
 	public String getSubPath() {
-		return String.join(File.separator, subPath);
+		return String.join(FILE_PATH_JOIN_DELIMITER, subPath);
 	}
 
 	public void setSubPath(String subPath) {
-		this.subPath = subPath.split(File.separator);
+		this.subPath = subPath.split(FILE_PATH_SPLIT_DELIMITER);
 	}
 
 	public String getDirId() {
