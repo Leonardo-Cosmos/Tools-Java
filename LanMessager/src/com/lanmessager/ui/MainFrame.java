@@ -947,6 +947,11 @@ public class MainFrame extends JFrame {
 		File dir = task.getDir();
 		File file = new File(dir, subPath);
 		
+		File parentDir = file.getParentFile();
+		if (!parentDir.exists()) {
+			parentDir.mkdirs();
+		}
+		
 		LOGGER.info(String.format("Receive %s of dir %s to %s",
 				subPath, dir.getAbsolutePath(), senderAddress));
 		
